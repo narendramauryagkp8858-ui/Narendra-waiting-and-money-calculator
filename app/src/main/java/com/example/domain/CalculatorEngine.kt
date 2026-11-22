@@ -161,7 +161,7 @@ object CalculatorEngine {
         val scaled = value.setScale(2, RoundingMode.HALF_UP)
         val hasFraction = scaled.remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) != 0
         val pattern = if (hasFraction) "#,##0.00" else "#,##0"
-        val df = DecimalFormat(pattern, DecimalFormatSymbols(Locale("en", "IN")))
+        val df = DecimalFormat(pattern, DecimalFormatSymbols(Locale.forLanguageTag("en-IN")))
         return "₹${df.format(scaled)}"
     }
 

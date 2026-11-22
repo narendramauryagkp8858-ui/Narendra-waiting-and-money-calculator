@@ -23,8 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AssistChip
@@ -417,7 +417,7 @@ fun WeightToMoneyScreen(
                                         shape = RoundedCornerShape(14.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Filled.ReceiptLong,
+                                            imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
                                             contentDescription = null,
                                             modifier = Modifier.size(18.dp)
                                         )
