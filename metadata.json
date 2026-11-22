@@ -1,0 +1,6 @@
+{
+  "name": "Narendra Weight & Money Calc",
+  "description": "Offline shopkeeper calculator for weight-to-money, money-to-weight, standard math, Room calculation history, custom shop profile, and WhatsApp/PDF/printable receipts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
