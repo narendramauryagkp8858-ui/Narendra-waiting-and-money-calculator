@@ -383,14 +383,22 @@ class MoneyToWeightViewModel(
 }
 
 data class NormalCalculatorUiState(
-    val expressionDisplay: String = "",
-    val currentInput: String = "0",
-    val pendingOperator: String? = null,
-    val accumulator: BigDecimal? = null,
+    val expression: String = "",
+    val evaluatedHeader: String = "",
+    val finalResultDisplay: String = "",
+    val livePreview: String = "",
     val isError: Boolean = false,
     val justEvaluated: Boolean = false,
     val lastSavedRecord: CalculationEntity? = null
-)
+) {
+    val primaryDisplay: String
+        get() = when {
+            isError -> finalResultDisplay
+            justEvaluated && finalResultDisplay.isNotEmpty() -> finalResultDisplay
+            expression.isNotEmpty() -> expression
+            else -> "0"
+        }
+}
 
 class NormalCalculatorViewModel(
     private val repository: CalculationRepository
@@ -399,40 +407,66 @@ class NormalCalculatorViewModel(
     private val _uiState = MutableStateFlow(NormalCalculatorUiState())
     val uiState: StateFlow<NormalCalculatorUiState> = _uiState.asStateFlow()
 
+    private val operators = setOf('+', '-', '×', '÷')
+
     fun onDigit(digit: String) {
         _uiState.update { state ->
-            if (state.isError) {
-                return@update NormalCalculatorUiState(currentInput = digit)
+            val baseExpr = when {
+                state.isError -> ""
+                state.justEvaluated -> ""
+                else -> state.expression
             }
-            if (state.justEvaluated && state.pendingOperator == null) {
-                return@update NormalCalculatorUiState(currentInput = digit)
+
+            // If previous token ended with %, insert × before new digit
+            val exprWithMult = if (baseExpr.endsWith("%")) "$baseExpr × " else baseExpr
+
+            // Avoid multiple leading zeros in the active number token
+            val activeToken = currentNumberToken(exprWithMult)
+            val nextExpr = when {
+                activeToken == "0" && digit == "0" -> exprWithMult
+                activeToken == "0" && digit != "0" -> exprWithMult.dropLast(1) + digit
+                else -> exprWithMult + digit
             }
-            val nextInput = when {
-                state.justEvaluated -> digit
-                state.currentInput == "0" -> digit
-                state.currentInput.length >= 15 -> state.currentInput
-                else -> state.currentInput + digit
+            buildStateFromExpression(nextExpr, state.lastSavedRecord)
+        }
+    }
+
+    fun onDoubleZero() {
+        _uiState.update { state ->
+            val baseExpr = when {
+                state.isError -> ""
+                state.justEvaluated -> ""
+                else -> state.expression
             }
-            state.copy(
-                currentInput = nextInput,
-                justEvaluated = false
-            )
+            val exprWithMult = if (baseExpr.endsWith("%")) "$baseExpr × " else baseExpr
+            val activeToken = currentNumberToken(exprWithMult)
+            val nextExpr = when {
+                activeToken.isEmpty() || activeToken == "0" -> {
+                    if (activeToken == "0") exprWithMult else "${exprWithMult}0"
+                }
+                else -> "${exprWithMult}00"
+            }
+            buildStateFromExpression(nextExpr, state.lastSavedRecord)
         }
     }
 
     fun onDecimal() {
         _uiState.update { state ->
-            if (state.isError) {
-                return@update NormalCalculatorUiState(currentInput = "0.")
+            val baseExpr = when {
+                state.isError -> ""
+                state.justEvaluated -> ""
+                else -> state.expression
             }
-            if (state.justEvaluated && state.pendingOperator == null) {
-                return@update NormalCalculatorUiState(currentInput = "0.")
+            val exprWithMult = if (baseExpr.endsWith("%")) "$baseExpr × " else baseExpr
+            val activeToken = currentNumberToken(exprWithMult)
+            if (activeToken.contains(".")) return@update state
+
+            val nextExpr = if (activeToken.isEmpty() || activeToken == "-") {
+                "${exprWithMult}0."
+            } else {
+                "$exprWithMult."
             }
-            if (state.justEvaluated) {
-                return@update state.copy(currentInput = "0.", justEvaluated = false)
-            }
-            if (state.currentInput.contains(".")) return@update state
-            state.copy(currentInput = state.currentInput + ".")
+            buildStateFromExpression(nextExpr, state.lastSavedRecord)
         }
     }
 
@@ -442,77 +476,81 @@ class NormalCalculatorViewModel(
 
     fun onBackspace() {
         _uiState.update { state ->
-            if (state.isError || state.justEvaluated) {
+            if (state.isError) {
                 return@update NormalCalculatorUiState()
             }
-            val next = if (state.currentInput.length <= 1 || state.currentInput == "-") {
-                "0"
-            } else {
-                state.currentInput.dropLast(1)
+            if (state.justEvaluated) {
+                // Allow editing the evaluated result back rather than losing it
+                val edited = state.finalResultDisplay.dropLast(1)
+                return@update if (edited.isEmpty() || edited == "-") {
+                    NormalCalculatorUiState(lastSavedRecord = state.lastSavedRecord)
+                } else {
+                    buildStateFromExpression(edited, state.lastSavedRecord)
+                }
             }
-            state.copy(currentInput = next)
+            val trimmed = state.expression.trimEnd()
+            if (trimmed.isEmpty()) {
+                return@update NormalCalculatorUiState(lastSavedRecord = state.lastSavedRecord)
+            }
+            val nextExpr = if (trimmed.last() in operators) {
+                trimmed.dropLast(1).trimEnd()
+            } else {
+                trimmed.dropLast(1)
+            }
+            buildStateFromExpression(nextExpr, state.lastSavedRecord)
         }
     }
 
     fun onOperator(op: String) {
-        val currentState = _uiState.value
-        if (currentState.isError) return
+        val opChar = op.firstOrNull() ?: return
+        _uiState.update { state ->
+            if (state.isError) return@update state
 
-        val currentBd = CalculatorEngine.parseDecimal(currentState.currentInput) ?: BigDecimal.ZERO
+            val baseExpr = if (state.justEvaluated && state.finalResultDisplay.isNotEmpty()) {
+                state.finalResultDisplay
+            } else {
+                state.expression
+            }
 
-        if (currentState.accumulator != null && currentState.pendingOperator != null && !currentState.justEvaluated) {
-            val expr = "${CalculatorEngine.formatPlainNumber(currentState.accumulator, 8)} ${currentState.pendingOperator} ${CalculatorEngine.formatPlainNumber(currentBd, 8)}"
-            val res = CalculatorEngine.applyOperation(currentState.accumulator, currentBd, currentState.pendingOperator)
-            if (res.isFailure) {
-                _uiState.update {
-                    it.copy(
-                        isError = true,
-                        currentInput = "Error",
-                        expressionDisplay = expr
-                    )
+            val trimmed = baseExpr.trimEnd()
+            if (trimmed.isEmpty()) {
+                return@update if (opChar == '-') {
+                    buildStateFromExpression("-", state.lastSavedRecord)
+                } else {
+                    state
                 }
-                return
             }
-            val newAcc = res.getOrThrow()
-            val formattedAcc = CalculatorEngine.formatPlainNumber(newAcc, 8)
-            _uiState.update {
-                it.copy(
-                    accumulator = newAcc,
-                    pendingOperator = op,
-                    currentInput = formattedAcc,
-                    expressionDisplay = "$formattedAcc $op",
-                    justEvaluated = true
-                )
-            }
-            saveNormalHistory(expr, formattedAcc, null)
-            return
-        }
 
-        val acc = if (currentState.justEvaluated && currentState.accumulator != null && currentState.pendingOperator != null) {
-            currentState.accumulator
-        } else {
-            currentBd
-        }
-        val formattedAcc = CalculatorEngine.formatPlainNumber(acc, 8)
-        _uiState.update {
-            it.copy(
-                accumulator = acc,
-                pendingOperator = op,
-                expressionDisplay = "$formattedAcc $op",
-                justEvaluated = true
-            )
+            val nextExpr = when {
+                trimmed == "-" -> if (opChar == '-') "-" else ""
+                trimmed.last() in operators -> {
+                    // Replace the trailing operator cleanly
+                    "${trimmed.dropLast(1).trimEnd()} $opChar "
+                }
+                trimmed.endsWith(".") -> {
+                    "${trimmed.dropLast(1)} $opChar "
+                }
+                else -> "$trimmed $opChar "
+            }
+            buildStateFromExpression(nextExpr, state.lastSavedRecord)
         }
     }
 
     fun onPercent() {
         _uiState.update { state ->
             if (state.isError) return@update state
-            val currentBd = CalculatorEngine.parseDecimal(state.currentInput) ?: return@update state
-            val percentVal = CalculatorEngine.applyPercent(state.accumulator, currentBd, state.pendingOperator)
-            state.copy(
-                currentInput = CalculatorEngine.formatPlainNumber(percentVal, 8),
-                justEvaluated = false
-            )
+            val baseExpr = if (state.justEvaluated && state.finalResultDisplay.isNotEmpty()) {
+                state.finalResultDisplay
+            } else {
+                state.expression
+            }
+            val trimmed = baseExpr.trimEnd()
+            if (trimmed.isEmpty()) return@update state
+            val lastCh = trimmed.last()
+            if (!lastCh.isDigit() && lastCh != '.') return@update state
+            val cleanBase = if (lastCh == '.') trimmed.dropLast(1) else trimmed
+            if (cleanBase.isEmpty()) return@update state
+            buildStateFromExpression("$cleanBase%", state.lastSavedRecord)
         }
     }
 
@@ -520,49 +558,86 @@ class NormalCalculatorViewModel(
         val state = _uiState.value
         if (state.isError) return
 
-        val right = CalculatorEngine.parseDecimal(state.currentInput) ?: BigDecimal.ZERO
-        val left = state.accumulator
-        val op = state.pendingOperator
+        val raw = if (state.justEvaluated && state.finalResultDisplay.isNotEmpty()) {
+            state.finalResultDisplay
+        } else {
+            state.expression
+        }.trim()
 
-        if (left == null || op == null) {
-            val plain = CalculatorEngine.formatPlainNumber(right, 8)
-            if (right.compareTo(BigDecimal.ZERO) != 0) {
-                saveNormalHistory(plain, plain, onSaved)
-            }
-            return
-        }
+        if (raw.isEmpty()) return
 
-        val expr = "${CalculatorEngine.formatPlainNumber(left, 8)} $op ${CalculatorEngine.formatPlainNumber(right, 8)}"
-        val result = CalculatorEngine.applyOperation(left, right, op)
-        if (result.isFailure) {
+        // Trim any trailing dangling operator when user taps = or Share
+        val evalExpr = raw.trimEnd { it == ' ' || it in operators }
+        if (evalExpr.isEmpty()) return
+
+        val res = CalculatorEngine.evaluateExpression(evalExpr, allowTrailingOperator = false)
+        if (res.isFailure) {
             _uiState.update {
                 it.copy(
+                    evaluatedHeader = evalExpr,
+                    finalResultDisplay = "Error",
+                    livePreview = "",
                     isError = true,
-                    currentInput = "Error",
-                    expressionDisplay = expr,
-                    accumulator = null,
-                    pendingOperator = null,
                     justEvaluated = true
                 )
             }
             return
         }
 
-        val finalValue = result.getOrThrow()
+        val finalValue = res.getOrNull() ?: return
         val finalStr = CalculatorEngine.formatPlainNumber(finalValue, 8)
 
         _uiState.update {
             it.copy(
-                expressionDisplay = "$expr =",
-                currentInput = finalStr,
-                accumulator = null,
-                pendingOperator = null,
-                justEvaluated = true,
-                isError = false
+                expression = finalStr,
+                evaluatedHeader = "$evalExpr =",
+                finalResultDisplay = finalStr,
+                livePreview = "",
+                isError = false,
+                justEvaluated = true
             )
         }
 
-        saveNormalHistory(expr, finalStr, onSaved)
+        saveNormalHistory(evalExpr, finalStr, onSaved)
+    }
+
+    private fun buildStateFromExpression(
+        expr: String,
+        lastSaved: CalculationEntity?
+    ): NormalCalculatorUiState {
+        val cleanPreview = computeLivePreview(expr)
+        return NormalCalculatorUiState(
+            expression = expr,
+            evaluatedHeader = "",
+            finalResultDisplay = "",
+            livePreview = cleanPreview,
+            isError = false,
+            justEvaluated = false,
+            lastSavedRecord = lastSaved
+        )
+    }
+
+    private fun computeLivePreview(expr: String): String {
+        val trimmed = expr.trim()
+        if (trimmed.isEmpty()) return ""
+        val hasOperatorOrPercent = trimmed.drop(1).any { it in operators || it == '%' }
+        if (!hasOperatorOrPercent) return ""
+
+        // Must have at least one complete operation after stripping any trailing operator
+        val effective = trimmed.trimEnd { it == ' ' || it in operators }
+        val effectiveHasOp = effective.drop(1).any { it in operators || it == '%' }
+        if (!effectiveHasOp) return ""
+
+        val res = CalculatorEngine.evaluateExpression(effective, allowTrailingOperator = false)
+        val value = res.getOrNull() ?: return ""
+        return CalculatorEngine.formatPlainNumber(value, 8)
+    }
+
+    private fun currentNumberToken(expr: String): String {
+        val trimmed = expr.trimEnd()
+        if (trimmed.isEmpty() || expr.endsWith(" ")) return ""
+        val lastOpIndex = trimmed.indexOfLast { it in operators }
+        return if (lastOpIndex == -1) trimmed else trimmed.substring(lastOpIndex + 1).trimStart()
     }
 
     private fun saveNormalHistory(

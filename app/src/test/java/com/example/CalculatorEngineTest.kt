@@ -119,4 +119,25 @@ class CalculatorEngineTest {
         assertEquals(0, BigDecimal("280").compareTo(totals.totalAmount))
         assertEquals("3 KG 500 Gram", CalculatorEngine.formatGramsHuman(totals.totalWeightInGrams, "KG", "Gram"))
     }
+
+    @Test
+    fun `evaluateExpression handles multi-step expressions, precedence, percent, and live trailing operators`() {
+        val multi = CalculatorEngine.evaluateExpression("100 + 50 - 20").getOrThrow()!!
+        assertEquals("130", CalculatorEngine.formatPlainNumber(multi, 8))
+
+        val precedence = CalculatorEngine.evaluateExpression("100 + 50 × 2").getOrThrow()!!
+        assertEquals("200", CalculatorEngine.formatPlainNumber(precedence, 8))
+
+        val pct = CalculatorEngine.evaluateExpression("200 + 10%").getOrThrow()!!
+        assertEquals("220", CalculatorEngine.formatPlainNumber(pct, 8))
+
+        val exactDecimal = CalculatorEngine.evaluateExpression("0.1 + 0.2").getOrThrow()!!
+        assertEquals("0.3", CalculatorEngine.formatPlainNumber(exactDecimal, 8))
+
+        val trailingOpPreview = CalculatorEngine.evaluateExpression("100 + 50 +", allowTrailingOperator = true).getOrThrow()!!
+        assertEquals("150", CalculatorEngine.formatPlainNumber(trailingOpPreview, 8))
+
+        val divZero = CalculatorEngine.evaluateExpression("50 ÷ 0")
+        assertTrue(divZero.isFailure)
+    }
 }

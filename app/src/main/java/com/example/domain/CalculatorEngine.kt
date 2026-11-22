@@ -174,6 +174,147 @@ object CalculatorEngine {
         }
     }
 
+    /**
+     * Evaluates a full expression string such as "100 + 50 - 20", "100 + 50 × 2", or "200 + 10%"
+     * using exact BigDecimal arithmetic. If allowTrailingOperator is true (for live preview),
+     * any incomplete trailing operator is trimmed before evaluation.
+     */
+    fun evaluateExpression(
+        rawExpression: String,
+        allowTrailingOperator: Boolean = false
+    ): Result<BigDecimal?> {
+        val cleaned = rawExpression.trim()
+        if (cleaned.isEmpty()) return Result.success(null)
+
+        val opsSet = setOf('+', '-', '×', '÷', '*', '/')
+        val working = if (allowTrailingOperator) {
+            cleaned.trimEnd { it == ' ' || it in opsSet }
+        } else {
+            cleaned
+        }
+        if (working.isEmpty()) return Result.success(null)
+        if (working.last() in opsSet) {
+            return Result.failure(IllegalArgumentException("Incomplete expression"))
+        }
+
+        // Tokenize into alternating operands and operators
+        data class Operand(val value: BigDecimal, val isPercent: Boolean)
+
+        val operands = mutableListOf<Operand>()
+        val operators = mutableListOf<Char>()
+        val numBuf = StringBuilder()
+
+        var i = 0
+        while (i < working.length) {
+            val ch = working[i]
+            when {
+                ch == ' ' -> i++
+                ch.isDigit() || ch == '.' -> {
+                    numBuf.append(ch)
+                    i++
+                }
+                ch == '-' && numBuf.isEmpty() && operands.size == operators.size -> {
+                    // Unary minus at start or right after an operator
+                    numBuf.append('-')
+                    i++
+                }
+                ch == '%' -> {
+                    val numStr = numBuf.toString()
+                    if (numStr.isEmpty() || numStr == "-" || numStr == ".") {
+                        return Result.failure(IllegalArgumentException("Invalid percent token"))
+                    }
+                    val bd = parseDecimal(numStr)
+                        ?: return Result.failure(IllegalArgumentException("Invalid number"))
+                    operands.add(Operand(bd, isPercent = true))
+                    numBuf.clear()
+                    i++
+                }
+                ch in opsSet -> {
+                    if (numBuf.isNotEmpty()) {
+                        val bd = parseDecimal(numBuf.toString())
+                            ?: return Result.failure(IllegalArgumentException("Invalid number"))
+                        operands.add(Operand(bd, isPercent = false))
+                        numBuf.clear()
+                    }
+                    if (operands.size <= operators.size) {
+                        return Result.failure(IllegalArgumentException("Invalid operator sequence"))
+                    }
+                    val normalizedOp = when (ch) {
+                        '*' -> '×'
+                        '/' -> '÷'
+                        else -> ch
+                    }
+                    operators.add(normalizedOp)
+                    i++
+                }
+                else -> return Result.failure(IllegalArgumentException("Unexpected character: $ch"))
+            }
+        }
+
+        if (numBuf.isNotEmpty()) {
+            val bd = parseDecimal(numBuf.toString())
+                ?: return Result.failure(IllegalArgumentException("Invalid number"))
+            operands.add(Operand(bd, isPercent = false))
+        }
+
+        if (operands.isEmpty()) return Result.success(null)
+        if (operands.size != operators.size + 1) {
+            return Result.failure(IllegalArgumentException("Mismatched operators"))
+        }
+
+        // Single operand (e.g., "50%" -> 0.5)
+        if (operators.isEmpty()) {
+            val only = operands.first()
+            val value = if (only.isPercent) {
+                only.value.divide(HUNDRED, 10, RoundingMode.HALF_UP).stripTrailingZerosSafe()
+            } else {
+                only.value.stripTrailingZerosSafe()
+            }
+            return Result.success(value)
+        }
+
+        // Pass 1: Evaluate high-precedence operators (× and ÷)
+        val reducedOperands = mutableListOf<Operand>()
+        val reducedOperators = mutableListOf<Char>()
+
+        fun Operand.asDirectValue(): BigDecimal =
+            if (isPercent) value.divide(HUNDRED, 10, RoundingMode.HALF_UP) else value
+
+        reducedOperands.add(operands[0])
+        for (idx in operators.indices) {
+            val op = operators[idx]
+            val right = operands[idx + 1]
+            if (op == '×' || op == '÷') {
+                val left = reducedOperands.removeAt(reducedOperands.lastIndex)
+                val leftVal = left.asDirectValue()
+                val rightVal = right.asDirectValue()
+                val res = applyOperation(leftVal, rightVal, op.toString())
+                if (res.isFailure) return Result.failure(res.exceptionOrNull()!!)
+                reducedOperands.add(Operand(res.getOrThrow(), isPercent = false))
+            } else {
+                reducedOperators.add(op)
+                reducedOperands.add(right)
+            }
+        }
+
+        // Pass 2: Evaluate + and - left-to-right (supporting shopkeeper percent like 200 + 10% = 220)
+        var acc = reducedOperands[0].asDirectValue()
+        for (idx in reducedOperators.indices) {
+            val op = reducedOperators[idx]
+            val right = reducedOperands[idx + 1]
+            val rightVal = if (right.isPercent) {
+                acc.multiply(right.value, MC).divide(HUNDRED, 10, RoundingMode.HALF_UP)
+            } else {
+                right.value
+            }
+            val res = applyOperation(acc, rightVal, op.toString())
+            if (res.isFailure) return Result.failure(res.exceptionOrNull()!!)
+            acc = res.getOrThrow()
+        }
+
+        return Result.success(acc.stripTrailingZerosSafe())
+    }
+
     fun formatAmount(value: BigDecimal): String {
         val scaled = value.setScale(2, RoundingMode.HALF_UP)
         val hasFraction = scaled.remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) != 0

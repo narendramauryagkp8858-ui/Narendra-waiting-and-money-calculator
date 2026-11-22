@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
@@ -29,6 +32,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,7 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +62,11 @@ fun NormalCalculatorScreen(
     val strings = LocalStrings.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val displayScrollState = rememberScrollState()
+
+    LaunchedEffect(state.primaryDisplay) {
+        displayScrollState.animateScrollTo(displayScrollState.maxValue)
+    }
 
     Scaffold(
         topBar = {
@@ -96,43 +104,81 @@ fun NormalCalculatorScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(20.dp),
+                            .padding(20.dp)
+                            .verticalScroll(displayScrollState),
                         verticalArrangement = Arrangement.Bottom,
                         horizontalAlignment = Alignment.End
                     ) {
+                        // Past evaluated expression header after pressing =
+                        AnimatedVisibility(visible = state.evaluatedHeader.isNotEmpty()) {
+                            Text(
+                                text = state.evaluatedHeader,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontFamily = JetBrainsMonoFamily
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 6.dp)
+                                    .testTag("calc_expression_display")
+                            )
+                        }
+
+                        // Full running expression OR final result after pressing =
+                        val mainText = if (state.isError) strings.cannotDivideByZero else state.primaryDisplay
+                        val mainFontSize = when {
+                            state.isError -> 22.sp
+                            mainText.length > 22 -> 24.sp
+                            mainText.length > 13 -> 30.sp
+                            else -> 40.sp
+                        }
+                        val mainLineHeight = when {
+                            state.isError -> 28.sp
+                            mainText.length > 22 -> 32.sp
+                            mainText.length > 13 -> 38.sp
+                            else -> 48.sp
+                        }
+
                         Text(
-                            text = state.expressionDisplay,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontFamily = JetBrainsMonoFamily
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.testTag("calc_expression_display")
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = if (state.isError) strings.cannotDivideByZero else state.currentInput,
+                            text = mainText,
                             style = MaterialTheme.typography.displayLarge.copy(
                                 fontFamily = JetBrainsMonoFamily,
-                                fontSize = if (state.isError) 22.sp else 44.sp,
-                                lineHeight = if (state.isError) 28.sp else 52.sp
+                                fontSize = mainFontSize,
+                                lineHeight = mainLineHeight
                             ),
-                            color = if (state.isError) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
+                            color = when {
+                                state.isError -> MaterialTheme.colorScheme.error
+                                state.justEvaluated -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurface
                             },
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.End,
-                            modifier = Modifier.testTag("calc_main_display")
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("calc_main_display")
                         )
+
+                        // Subtle Live Preview Result WITHOUT pressing '='
+                        AnimatedVisibility(visible = state.livePreview.isNotEmpty() && !state.justEvaluated && !state.isError) {
+                            Text(
+                                text = "= ${state.livePreview}",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontFamily = JetBrainsMonoFamily,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                textAlign = TextAlign.End,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                                    .testTag("calc_live_preview")
+                            )
+                        }
                     }
                 }
 
-                // WhatsApp Share & Receipt Bar (always accessible on calculation result)
+                // Direct WhatsApp Share & Receipt Bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -190,7 +236,6 @@ fun NormalCalculatorScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Row 1: AC, Backspace, %, ÷
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -238,7 +283,6 @@ fun NormalCalculatorScreen(
                         )
                     }
 
-                    // Row 2: 7 8 9 ×
                     CalcNumberOperatorRow(
                         nums = listOf("7", "8", "9"),
                         op = "×",
@@ -247,7 +291,6 @@ fun NormalCalculatorScreen(
                         onOperator = viewModel::onOperator
                     )
 
-                    // Row 3: 4 5 6 -
                     CalcNumberOperatorRow(
                         nums = listOf("4", "5", "6"),
                         op = "-",
@@ -256,7 +299,6 @@ fun NormalCalculatorScreen(
                         onOperator = viewModel::onOperator
                     )
 
-                    // Row 4: 1 2 3 +
                     CalcNumberOperatorRow(
                         nums = listOf("1", "2", "3"),
                         op = "+",
@@ -265,7 +307,6 @@ fun NormalCalculatorScreen(
                         onOperator = viewModel::onOperator
                     )
 
-                    // Row 5: 00, 0, ., =
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -274,10 +315,7 @@ fun NormalCalculatorScreen(
                             label = "00",
                             containerColor = MaterialTheme.colorScheme.surface,
                             contentColor = MaterialTheme.colorScheme.onSurface,
-                            onClick = {
-                                viewModel.onDigit("0")
-                                viewModel.onDigit("0")
-                            },
+                            onClick = viewModel::onDoubleZero,
                             testTag = "calc_key_00",
                             modifier = Modifier.weight(1f)
                         )
