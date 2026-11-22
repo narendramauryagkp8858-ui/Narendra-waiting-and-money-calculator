@@ -177,11 +177,16 @@ object ReceiptPdfHelper {
             y += 20f
             val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.parseColor("#334155")
-                textSize = 13f
+                textSize = 12.5f
                 textAlign = Paint.Align.LEFT
             }
-            canvas.drawText(calculation.detailsSummary, margin + 12f, y, detailPaint)
-            y += 24f
+            calculation.detailsSummary.lines().take(14).forEach { line ->
+                if (y < cardRect.bottom - 140f) {
+                    canvas.drawText(line, margin + 12f, y, detailPaint)
+                    y += 18f
+                }
+            }
+            y += 6f
         }
 
         y += 8f

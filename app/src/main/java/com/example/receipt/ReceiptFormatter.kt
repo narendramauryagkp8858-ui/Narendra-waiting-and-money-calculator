@@ -1,7 +1,9 @@
 package com.example.receipt
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import com.example.data.local.CalculationEntity
 import com.example.data.local.ShopProfile
 import com.example.domain.CalculationType
@@ -20,6 +22,7 @@ object ReceiptFormatter {
         return when (CalculationType.fromKey(typeKey)) {
             CalculationType.WEIGHT_TO_MONEY -> strings.weightToMoneyTitle
             CalculationType.MONEY_TO_WEIGHT -> strings.moneyToWeightTitle
+            CalculationType.COMBINED_BILL -> strings.combinedBillTitle
             CalculationType.NORMAL -> strings.normalCalculatorTitle
         }
     }
@@ -57,13 +60,51 @@ object ReceiptFormatter {
             sb.appendLine("${strings.amountLabel}: ${calculation.amountDisplay}")
         }
         if (calculation.detailsSummary.isNotBlank()) {
-            sb.appendLine("${strings.calculationDetailsLabel}: ${calculation.detailsSummary}")
+            sb.appendLine("${strings.calculationDetailsLabel}:")
+            sb.appendLine(calculation.detailsSummary)
         }
         sb.appendLine("--------------------------------")
         sb.appendLine("*${strings.finalResultLabel}: ${calculation.finalResult}*")
         sb.appendLine("--------------------------------")
         sb.append("_${strings.receiptFooterBrand}_")
         return sb.toString()
+    }
+
+    /**
+     * Shares receipt text directly to WhatsApp (or WhatsApp Business), avoiding generic share sheets.
+     * Falls back to Android's native share chooser with a notice only if WhatsApp is not installed.
+     */
+    fun shareDirectlyToWhatsApp(
+        context: Context,
+        text: String,
+        strings: AppStrings
+    ) {
+        val pm = context.packageManager
+        val targetPackage = listOf("com.whatsapp", "com.whatsapp.w4b").firstOrNull { pkg ->
+            val probe = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                setPackage(pkg)
+            }
+            probe.resolveActivity(pm) != null
+        }
+
+        if (targetPackage != null) {
+            try {
+                val waIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    setPackage(targetPackage)
+                    putExtra(Intent.EXTRA_TEXT, text)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(waIntent)
+                return
+            } catch (_: ActivityNotFoundException) {
+                // Fall through to chooser fallback
+            }
+        }
+
+        Toast.makeText(context, strings.whatsappNotInstalled, Toast.LENGTH_SHORT).show()
+        shareText(context, text, strings.shareChooserTitle)
     }
 
     fun shareText(context: Context, text: String, chooserTitle: String) {

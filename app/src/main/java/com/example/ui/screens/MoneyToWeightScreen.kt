@@ -24,10 +24,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -45,6 +47,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -57,6 +60,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.ShopProfile
+import com.example.domain.BillLineItem
 import com.example.domain.CalculatorEngine
 import com.example.localization.LocalStrings
 import com.example.receipt.ReceiptFormatter
@@ -65,12 +69,16 @@ import com.example.ui.components.ResultDetailRow
 import com.example.ui.components.WhatsAppActionButton
 import com.example.ui.viewmodel.MoneyToWeightViewModel
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MoneyToWeightScreen(
     viewModel: MoneyToWeightViewModel,
     shopProfile: ShopProfile,
+    billItems: List<BillLineItem>,
+    onAddToBill: (itemName: String, pricePerKg: BigDecimal, weightInGrams: BigDecimal, amount: BigDecimal) -> Unit,
+    onOpenCombinedBill: () -> Unit,
     onBack: () -> Unit,
     onOpenReceipt: (Long) -> Unit
 ) {
@@ -80,12 +88,43 @@ fun MoneyToWeightScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.flushAutoSaveIfNeeded()
+        }
+    }
+
     Scaffold(
         topBar = {
             NarendraTopBar(
                 title = strings.moneyToWeightTitle,
                 onBack = onBack,
                 actions = {
+                    if (billItems.isNotEmpty()) {
+                        Surface(
+                            onClick = onOpenCombinedBill,
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .minimumInteractiveComponentSize()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.AddShoppingCart,
+                                    contentDescription = strings.viewFullBill,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Badge {
+                                    Text("${billItems.size}")
+                                }
+                            }
+                        }
+                    }
                     IconButton(
                         onClick = { viewModel.reset() },
                         modifier = Modifier
@@ -277,7 +316,7 @@ fun MoneyToWeightScreen(
                                                 modifier = Modifier.size(16.dp)
                                             )
                                             Text(
-                                                text = strings.savedToHistory,
+                                                text = strings.autoSavedLabel,
                                                 style = MaterialTheme.typography.labelMedium,
                                                 color = MaterialTheme.colorScheme.secondary
                                             )
@@ -310,7 +349,35 @@ fun MoneyToWeightScreen(
                                     highlightValue = true
                                 )
 
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Button(
+                                    onClick = {
+                                        viewModel.calculateAndSave {
+                                            onAddToBill(
+                                                state.itemName,
+                                                result.pricePerKg,
+                                                result.weightInGrams,
+                                                result.customerAmount
+                                            )
+                                            viewModel.prepareForNextBatch()
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar(strings.addedToBill)
+                                            }
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(14.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .testTag("m2w_add_to_bill_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.AddShoppingCart,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(strings.addToBill)
+                                }
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -324,16 +391,16 @@ fun MoneyToWeightScreen(
                                                 val text = ReceiptFormatter.buildWhatsAppTextReceipt(
                                                     existing, shopProfile, strings
                                                 )
-                                                ReceiptFormatter.shareText(
-                                                    context, text, strings.shareChooserTitle
+                                                ReceiptFormatter.shareDirectlyToWhatsApp(
+                                                    context, text, strings
                                                 )
                                             } else {
                                                 viewModel.calculateAndSave { saved ->
                                                     val text = ReceiptFormatter.buildWhatsAppTextReceipt(
                                                         saved, shopProfile, strings
                                                     )
-                                                    ReceiptFormatter.shareText(
-                                                        context, text, strings.shareChooserTitle
+                                                    ReceiptFormatter.shareDirectlyToWhatsApp(
+                                                        context, text, strings
                                                     )
                                                 }
                                             }

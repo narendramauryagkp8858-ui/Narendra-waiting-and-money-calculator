@@ -5,6 +5,7 @@ object Routes {
     const val DASHBOARD = "dashboard"
     const val WEIGHT_TO_MONEY = "weight_to_money"
     const val MONEY_TO_WEIGHT = "money_to_weight"
+    const val COMBINED_BILL = "combined_bill"
     const val NORMAL_CALCULATOR = "normal_calculator"
     const val HISTORY = "history"
     const val SHOP_PROFILE = "shop_profile"

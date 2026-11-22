@@ -151,6 +151,12 @@ fun HistoryScreen(
                         modifier = Modifier.testTag("history_filter_m2w")
                     )
                     FilterChip(
+                        selected = selectedFilter == CalculationType.COMBINED_BILL,
+                        onClick = { selectedFilter = CalculationType.COMBINED_BILL },
+                        label = { Text(strings.combinedBillTitle) },
+                        modifier = Modifier.testTag("history_filter_bill")
+                    )
+                    FilterChip(
                         selected = selectedFilter == CalculationType.NORMAL,
                         onClick = { selectedFilter = CalculationType.NORMAL },
                         label = { Text(strings.normalCalculatorTitle) },
@@ -214,8 +220,8 @@ fun HistoryScreen(
                                     val text = ReceiptFormatter.buildWhatsAppTextReceipt(
                                         item, shopProfile, strings
                                     )
-                                    ReceiptFormatter.shareText(
-                                        context, text, strings.shareChooserTitle
+                                    ReceiptFormatter.shareDirectlyToWhatsApp(
+                                        context, text, strings
                                     )
                                 }
                             )
@@ -249,11 +255,13 @@ private fun HistoryItemCard(
     val badgeColor = when (calcType) {
         CalculationType.WEIGHT_TO_MONEY -> MaterialTheme.colorScheme.primaryContainer
         CalculationType.MONEY_TO_WEIGHT -> MaterialTheme.colorScheme.secondaryContainer
+        CalculationType.COMBINED_BILL -> MaterialTheme.colorScheme.primaryContainer
         CalculationType.NORMAL -> MaterialTheme.colorScheme.tertiaryContainer
     }
     val badgeTextColor = when (calcType) {
         CalculationType.WEIGHT_TO_MONEY -> MaterialTheme.colorScheme.onPrimaryContainer
         CalculationType.MONEY_TO_WEIGHT -> MaterialTheme.colorScheme.onSecondaryContainer
+        CalculationType.COMBINED_BILL -> MaterialTheme.colorScheme.onPrimaryContainer
         CalculationType.NORMAL -> MaterialTheme.colorScheme.onTertiaryContainer
     }
 
@@ -329,7 +337,7 @@ private fun HistoryItemCard(
             if (item.amountDisplay.isNotBlank()) {
                 ResultDetailRow(label = strings.amountLabel, value = item.amountDisplay)
             }
-            if (item.detailsSummary.isNotBlank() && calcType == CalculationType.NORMAL) {
+            if (item.detailsSummary.isNotBlank() && (calcType == CalculationType.NORMAL || calcType == CalculationType.COMBINED_BILL)) {
                 Text(
                     text = item.detailsSummary,
                     style = MaterialTheme.typography.bodyMedium,

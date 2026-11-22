@@ -331,21 +331,37 @@ fun ReceiptScreen(
                             }
                         }
 
-                        // Action Buttons: Share as Text (WhatsApp), Share as PDF, Download PDF, Print Receipt
+                        // Action Buttons: Direct WhatsApp, Share via Other Apps, Share PDF, Download PDF, Print Receipt
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             WhatsAppActionButton(
-                                text = "${strings.shareWhatsApp} / ${strings.shareAsText}",
+                                text = strings.shareWhatsApp,
+                                onClick = {
+                                    val text = ReceiptFormatter.buildWhatsAppTextReceipt(
+                                        calc, shopProfile, strings
+                                    )
+                                    ReceiptFormatter.shareDirectlyToWhatsApp(context, text, strings)
+                                },
+                                testTag = "receipt_share_whatsapp_button",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                            )
+
+                            OutlinedButton(
                                 onClick = {
                                     val text = ReceiptFormatter.buildWhatsAppTextReceipt(
                                         calc, shopProfile, strings
                                     )
                                     ReceiptFormatter.shareText(context, text, strings.shareChooserTitle)
                                 },
-                                testTag = "receipt_share_text_button",
+                                shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(52.dp)
-                            )
+                                    .height(48.dp)
+                                    .testTag("receipt_share_text_button")
+                            ) {
+                                Text(strings.shareToOtherApps)
+                            }
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),

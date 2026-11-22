@@ -10,6 +10,8 @@ import com.example.domain.CalculatorEngine
 import com.example.domain.MoneyWeightResult
 import com.example.domain.WeightMoneyResult
 import com.example.domain.WeightUnit
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,8 +37,13 @@ class WeightToMoneyViewModel(
     private val _uiState = MutableStateFlow(WeightToMoneyUiState())
     val uiState: StateFlow<WeightToMoneyUiState> = _uiState.asStateFlow()
 
+    private var autoSaveJob: Job? = null
+    private var activeSessionHistoryId: Long? = null
+    private var lastSavedSignature: String? = null
+
     fun updateItemName(value: String) {
         _uiState.update { it.copy(itemName = value) }
+        scheduleAutoSave()
     }
 
     fun updatePrice(value: String) {
@@ -45,6 +52,7 @@ class WeightToMoneyViewModel(
             val next = state.copy(pricePerKgInput = filtered, priceError = false)
             recalculate(next)
         }
+        scheduleAutoSave()
     }
 
     fun updateWeight(value: String) {
@@ -53,6 +61,7 @@ class WeightToMoneyViewModel(
             val next = state.copy(weightInput = filtered, weightError = false)
             recalculate(next)
         }
+        scheduleAutoSave()
     }
 
     fun selectUnit(unit: WeightUnit) {
@@ -60,6 +69,7 @@ class WeightToMoneyViewModel(
             val next = state.copy(selectedUnit = unit)
             recalculate(next)
         }
+        scheduleAutoSave()
     }
 
     fun applyQuickWeight(weight: String, unit: WeightUnit) {
@@ -67,10 +77,42 @@ class WeightToMoneyViewModel(
             val next = state.copy(weightInput = weight, selectedUnit = unit, weightError = false)
             recalculate(next)
         }
+        scheduleAutoSave()
     }
 
     fun reset() {
+        autoSaveJob?.cancel()
+        activeSessionHistoryId = null
+        lastSavedSignature = null
         _uiState.value = WeightToMoneyUiState()
+    }
+
+    /**
+     * Clears weight input after adding an item to the combined bill while keeping pricePerKg ready
+     * for the next weight batch (e.g., weighing Loha 1kg, then 2kg, then 500g at same rate).
+     */
+    fun prepareForNextBatch() {
+        autoSaveJob?.cancel()
+        activeSessionHistoryId = null
+        lastSavedSignature = null
+        _uiState.update { state ->
+            state.copy(
+                weightInput = "",
+                liveResult = null,
+                weightError = false,
+                savedRecord = null
+            )
+        }
+    }
+
+    fun flushAutoSaveIfNeeded() {
+        val state = _uiState.value
+        if (state.liveResult != null && buildSignature(state) != lastSavedSignature) {
+            autoSaveJob?.cancel()
+            viewModelScope.launch {
+                persistCurrentResult(state, state.liveResult)
+            }
+        }
     }
 
     fun calculateAndSave(onSaved: (CalculationEntity) -> Unit = {}) {
@@ -88,7 +130,37 @@ class WeightToMoneyViewModel(
             return
         }
 
+        autoSaveJob?.cancel()
         val result = CalculatorEngine.calculateWeightToMoney(price, weight, state.selectedUnit)
+        viewModelScope.launch {
+            val saved = persistCurrentResult(state, result)
+            onSaved(saved)
+        }
+    }
+
+    private fun scheduleAutoSave() {
+        autoSaveJob?.cancel()
+        val state = _uiState.value
+        val result = state.liveResult ?: return
+        val signature = buildSignature(state)
+        if (signature == lastSavedSignature) return
+
+        autoSaveJob = viewModelScope.launch {
+            delay(650L)
+            persistCurrentResult(_uiState.value, result)
+        }
+    }
+
+    private suspend fun persistCurrentResult(
+        state: WeightToMoneyUiState,
+        result: WeightMoneyResult
+    ): CalculationEntity {
+        val signature = buildSignature(state)
+        val existing = state.savedRecord
+        if (existing != null && signature == lastSavedSignature) {
+            return existing
+        }
+
         val unitLabel = if (result.inputUnit == WeightUnit.KG) "KG" else "Gram"
         val gramsStr = CalculatorEngine.formatPlainNumber(result.weightInGrams, 2)
         val kgStr = CalculatorEngine.formatPlainNumber(result.weightInKg, 3)
@@ -101,6 +173,7 @@ class WeightToMoneyViewModel(
         val finalAmountStr = CalculatorEngine.formatAmount(result.totalAmount)
 
         val entity = CalculationEntity(
+            id = activeSessionHistoryId ?: 0L,
             timestamp = System.currentTimeMillis(),
             calculationType = CalculationType.WEIGHT_TO_MONEY.key,
             itemName = state.itemName.trim(),
@@ -111,13 +184,16 @@ class WeightToMoneyViewModel(
             detailsSummary = "${CalculatorEngine.formatPlainNumber(result.inputWeight, 3)} $unitLabel × $rateStr = $finalAmountStr"
         )
 
-        viewModelScope.launch {
-            val insertedId = repository.insert(entity)
-            val saved = entity.copy(id = insertedId)
-            _uiState.update { it.copy(liveResult = result, savedRecord = saved) }
-            onSaved(saved)
-        }
+        val insertedId = repository.insert(entity)
+        activeSessionHistoryId = insertedId
+        lastSavedSignature = signature
+        val saved = entity.copy(id = insertedId)
+        _uiState.update { it.copy(liveResult = result, savedRecord = saved) }
+        return saved
     }
+
+    private fun buildSignature(state: WeightToMoneyUiState): String =
+        "${state.pricePerKgInput}|${state.weightInput}|${state.selectedUnit.name}|${state.itemName.trim()}"
 
     private fun recalculate(state: WeightToMoneyUiState): WeightToMoneyUiState {
         val price = CalculatorEngine.parsePositiveDecimal(state.pricePerKgInput)
@@ -127,7 +203,10 @@ class WeightToMoneyViewModel(
         } else {
             null
         }
-        return state.copy(liveResult = result, savedRecord = null)
+        return state.copy(
+            liveResult = result,
+            savedRecord = if (result == null) null else state.savedRecord
+        )
     }
 }
 
@@ -148,8 +227,13 @@ class MoneyToWeightViewModel(
     private val _uiState = MutableStateFlow(MoneyToWeightUiState())
     val uiState: StateFlow<MoneyToWeightUiState> = _uiState.asStateFlow()
 
+    private var autoSaveJob: Job? = null
+    private var activeSessionHistoryId: Long? = null
+    private var lastSavedSignature: String? = null
+
     fun updateItemName(value: String) {
         _uiState.update { it.copy(itemName = value) }
+        scheduleAutoSave()
     }
 
     fun updatePrice(value: String) {
@@ -158,6 +242,7 @@ class MoneyToWeightViewModel(
             val next = state.copy(pricePerKgInput = filtered, priceError = false)
             recalculate(next)
         }
+        scheduleAutoSave()
     }
 
     fun updateAmount(value: String) {
@@ -166,6 +251,7 @@ class MoneyToWeightViewModel(
             val next = state.copy(amountInput = filtered, amountError = false)
             recalculate(next)
         }
+        scheduleAutoSave()
     }
 
     fun applyQuickAmount(amount: String) {
@@ -173,10 +259,38 @@ class MoneyToWeightViewModel(
             val next = state.copy(amountInput = amount, amountError = false)
             recalculate(next)
         }
+        scheduleAutoSave()
     }
 
     fun reset() {
+        autoSaveJob?.cancel()
+        activeSessionHistoryId = null
+        lastSavedSignature = null
         _uiState.value = MoneyToWeightUiState()
+    }
+
+    fun prepareForNextBatch() {
+        autoSaveJob?.cancel()
+        activeSessionHistoryId = null
+        lastSavedSignature = null
+        _uiState.update { state ->
+            state.copy(
+                amountInput = "",
+                liveResult = null,
+                amountError = false,
+                savedRecord = null
+            )
+        }
+    }
+
+    fun flushAutoSaveIfNeeded() {
+        val state = _uiState.value
+        if (state.liveResult != null && buildSignature(state) != lastSavedSignature) {
+            autoSaveJob?.cancel()
+            viewModelScope.launch {
+                persistCurrentResult(state, state.liveResult)
+            }
+        }
     }
 
     fun calculateAndSave(onSaved: (CalculationEntity) -> Unit = {}) {
@@ -194,13 +308,44 @@ class MoneyToWeightViewModel(
             return
         }
 
+        autoSaveJob?.cancel()
         val result = CalculatorEngine.calculateMoneyToWeight(price, amount)
+        viewModelScope.launch {
+            val saved = persistCurrentResult(state, result)
+            onSaved(saved)
+        }
+    }
+
+    private fun scheduleAutoSave() {
+        autoSaveJob?.cancel()
+        val state = _uiState.value
+        val result = state.liveResult ?: return
+        val signature = buildSignature(state)
+        if (signature == lastSavedSignature) return
+
+        autoSaveJob = viewModelScope.launch {
+            delay(650L)
+            persistCurrentResult(_uiState.value, result)
+        }
+    }
+
+    private suspend fun persistCurrentResult(
+        state: MoneyToWeightUiState,
+        result: MoneyWeightResult
+    ): CalculationEntity {
+        val signature = buildSignature(state)
+        val existing = state.savedRecord
+        if (existing != null && signature == lastSavedSignature) {
+            return existing
+        }
+
         val rateStr = "${CalculatorEngine.formatAmount(result.pricePerKg)} / KG"
         val amountStr = CalculatorEngine.formatAmount(result.customerAmount)
         val humanWeight = CalculatorEngine.formatWeightHuman(result, "KG", "Gram")
         val totalGramsStr = "${CalculatorEngine.formatPlainNumber(result.weightInGrams, 2)} g"
 
         val entity = CalculationEntity(
+            id = activeSessionHistoryId ?: 0L,
             timestamp = System.currentTimeMillis(),
             calculationType = CalculationType.MONEY_TO_WEIGHT.key,
             itemName = state.itemName.trim(),
@@ -211,13 +356,16 @@ class MoneyToWeightViewModel(
             detailsSummary = "$amountStr ÷ $rateStr = $humanWeight ($totalGramsStr)"
         )
 
-        viewModelScope.launch {
-            val insertedId = repository.insert(entity)
-            val saved = entity.copy(id = insertedId)
-            _uiState.update { it.copy(liveResult = result, savedRecord = saved) }
-            onSaved(saved)
-        }
+        val insertedId = repository.insert(entity)
+        activeSessionHistoryId = insertedId
+        lastSavedSignature = signature
+        val saved = entity.copy(id = insertedId)
+        _uiState.update { it.copy(liveResult = result, savedRecord = saved) }
+        return saved
     }
+
+    private fun buildSignature(state: MoneyToWeightUiState): String =
+        "${state.pricePerKgInput}|${state.amountInput}|${state.itemName.trim()}"
 
     private fun recalculate(state: MoneyToWeightUiState): MoneyToWeightUiState {
         val price = CalculatorEngine.parsePositiveDecimal(state.pricePerKgInput)
@@ -227,7 +375,10 @@ class MoneyToWeightViewModel(
         } else {
             null
         }
-        return state.copy(liveResult = result, savedRecord = null)
+        return state.copy(
+            liveResult = result,
+            savedRecord = if (result == null) null else state.savedRecord
+        )
     }
 }
 
@@ -304,22 +455,28 @@ class NormalCalculatorViewModel(
     }
 
     fun onOperator(op: String) {
-        _uiState.update { state ->
-            if (state.isError) return@update state
-            val currentBd = CalculatorEngine.parseDecimal(state.currentInput) ?: BigDecimal.ZERO
+        val currentState = _uiState.value
+        if (currentState.isError) return
 
-            if (state.accumulator != null && state.pendingOperator != null && !state.justEvaluated) {
-                val res = CalculatorEngine.applyOperation(state.accumulator, currentBd, state.pendingOperator)
-                if (res.isFailure) {
-                    return@update state.copy(
+        val currentBd = CalculatorEngine.parseDecimal(currentState.currentInput) ?: BigDecimal.ZERO
+
+        if (currentState.accumulator != null && currentState.pendingOperator != null && !currentState.justEvaluated) {
+            val expr = "${CalculatorEngine.formatPlainNumber(currentState.accumulator, 8)} ${currentState.pendingOperator} ${CalculatorEngine.formatPlainNumber(currentBd, 8)}"
+            val res = CalculatorEngine.applyOperation(currentState.accumulator, currentBd, currentState.pendingOperator)
+            if (res.isFailure) {
+                _uiState.update {
+                    it.copy(
                         isError = true,
                         currentInput = "Error",
-                        expressionDisplay = "${CalculatorEngine.formatPlainNumber(state.accumulator, 8)} ${state.pendingOperator} ${state.currentInput}"
+                        expressionDisplay = expr
                     )
                 }
-                val newAcc = res.getOrThrow()
-                val formattedAcc = CalculatorEngine.formatPlainNumber(newAcc, 8)
-                return@update state.copy(
+                return
+            }
+            val newAcc = res.getOrThrow()
+            val formattedAcc = CalculatorEngine.formatPlainNumber(newAcc, 8)
+            _uiState.update {
+                it.copy(
                     accumulator = newAcc,
                     pendingOperator = op,
                     currentInput = formattedAcc,
@@ -327,14 +484,18 @@ class NormalCalculatorViewModel(
                     justEvaluated = true
                 )
             }
+            saveNormalHistory(expr, formattedAcc, null)
+            return
+        }
 
-            val acc = if (state.justEvaluated && state.accumulator != null && state.pendingOperator != null) {
-                state.accumulator
-            } else {
-                currentBd
-            }
-            val formattedAcc = CalculatorEngine.formatPlainNumber(acc, 8)
-            state.copy(
+        val acc = if (currentState.justEvaluated && currentState.accumulator != null && currentState.pendingOperator != null) {
+            currentState.accumulator
+        } else {
+            currentBd
+        }
+        val formattedAcc = CalculatorEngine.formatPlainNumber(acc, 8)
+        _uiState.update {
+            it.copy(
                 accumulator = acc,
                 pendingOperator = op,
                 expressionDisplay = "$formattedAcc $op",
@@ -364,7 +525,6 @@ class NormalCalculatorViewModel(
         val op = state.pendingOperator
 
         if (left == null || op == null) {
-            // Save single evaluated value if non-zero
             val plain = CalculatorEngine.formatPlainNumber(right, 8)
             if (right.compareTo(BigDecimal.ZERO) != 0) {
                 saveNormalHistory(plain, plain, onSaved)

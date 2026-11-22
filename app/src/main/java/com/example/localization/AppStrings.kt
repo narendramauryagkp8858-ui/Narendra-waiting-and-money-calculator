@@ -123,7 +123,23 @@ data class AppStrings(
     val close: String,
     val back: String,
     val calculationDetailsLabel: String,
-    val recentBillPickTitle: String
+    val recentBillPickTitle: String,
+    // Combined Multi-Weight Bill
+    val combinedBillTitle: String,
+    val combinedBillDesc: String,
+    val addToBill: String,
+    val addedToBill: String,
+    val viewFullBill: String,
+    val billItemsCount: String,
+    val grandTotalLabel: String,
+    val clearBill: String,
+    val emptyBillTitle: String,
+    val emptyBillSubtitle: String,
+    val addItemToBillBtn: String,
+    val saveAndShareWhatsApp: String,
+    val shareToOtherApps: String,
+    val whatsappNotInstalled: String,
+    val autoSavedLabel: String
 )
 
 val EnglishStrings = AppStrings(
@@ -238,7 +254,22 @@ val EnglishStrings = AppStrings(
     close = "Close",
     back = "Back",
     calculationDetailsLabel = "Calculation Details",
-    recentBillPickTitle = "Select a Calculation to Share"
+    recentBillPickTitle = "Select a Calculation to Share",
+    combinedBillTitle = "Multi-Weight Bill",
+    combinedBillDesc = "Add multiple weights (1kg + 2kg...) into one bill",
+    addToBill = "Add to Bill",
+    addedToBill = "Added to Bill",
+    viewFullBill = "View Bill",
+    billItemsCount = "Items in Bill",
+    grandTotalLabel = "Grand Total",
+    clearBill = "Clear Bill",
+    emptyBillTitle = "Bill is empty",
+    emptyBillSubtitle = "Add weights from above or from Weight-to-Money calculator to build a combined customer bill.",
+    addItemToBillBtn = "Add Item to Bill",
+    saveAndShareWhatsApp = "Save & Share on WhatsApp",
+    shareToOtherApps = "Share via Other Apps",
+    whatsappNotInstalled = "WhatsApp is not installed on this device; opening share options.",
+    autoSavedLabel = "Auto-saved to History"
 )
 
 val HindiStrings = AppStrings(
@@ -353,7 +384,22 @@ val HindiStrings = AppStrings(
     close = "बंद करें",
     back = "वापस",
     calculationDetailsLabel = "हिसाब विवरण",
-    recentBillPickTitle = "शेयर करने के लिए हिसाब चुनें"
+    recentBillPickTitle = "शेयर करने के लिए हिसाब चुनें",
+    combinedBillTitle = "वज़न जोड़ बिल",
+    combinedBillDesc = "1kg + 2kg जैसे कई वज़न एक बिल में जोड़ें",
+    addToBill = "बिल में जोड़ें",
+    addedToBill = "बिल में जुड़ गया",
+    viewFullBill = "पूरा बिल देखें",
+    billItemsCount = "बिल में सामान",
+    grandTotalLabel = "कुल बिल राशि",
+    clearBill = "बिल खाली करें",
+    emptyBillTitle = "बिल अभी खाली है",
+    emptyBillSubtitle = "ऊपर से या वज़न से पैसा कैलकुलेटर से कई वज़न जोड़कर एक साथ पूरा बिल बनाएं।",
+    addItemToBillBtn = "बिल में आइटम जोड़ें",
+    saveAndShareWhatsApp = "सेव करें और WhatsApp पर भेजें",
+    shareToOtherApps = "अन्य ऐप्स पर शेयर करें",
+    whatsappNotInstalled = "इस फ़ोन में WhatsApp इंस्टॉल नहीं है; अन्य शेयर विकल्प खुल रहे हैं।",
+    autoSavedLabel = "इतिहास में अपने आप सेव हुआ"
 )
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {

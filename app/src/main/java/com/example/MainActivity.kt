@@ -18,6 +18,7 @@ import com.example.data.local.ThemeMode
 import com.example.localization.LocalStrings
 import com.example.localization.stringsFor
 import com.example.ui.navigation.Routes
+import com.example.ui.screens.CombinedBillScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.HistoryScreen
 import com.example.ui.screens.MoneyToWeightScreen
@@ -43,6 +44,7 @@ class MainActivity : ComponentActivity() {
             val prefs by mainViewModel.userPreferences.collectAsStateWithLifecycle()
             val history by mainViewModel.calculationHistory.collectAsStateWithLifecycle()
             val latestCalc by mainViewModel.latestCalculation.collectAsStateWithLifecycle()
+            val billItems by mainViewModel.billItems.collectAsStateWithLifecycle()
 
             val calcFactory = CalculatorViewModelFactory(mainViewModel.calculationRepository)
             val strings = stringsFor(prefs.appLanguage)
@@ -70,6 +72,7 @@ class MainActivity : ComponentActivity() {
                             DashboardScreen(
                                 shopProfile = prefs.shopProfile,
                                 historyCount = history.size,
+                                billCount = billItems.size,
                                 latestCalculation = latestCalc,
                                 currentLanguage = prefs.appLanguage,
                                 currentThemeMode = prefs.themeMode,
@@ -95,6 +98,9 @@ class MainActivity : ComponentActivity() {
                                 onNavigateMoneyToWeight = {
                                     navController.navigate(Routes.MONEY_TO_WEIGHT)
                                 },
+                                onNavigateCombinedBill = {
+                                    navController.navigate(Routes.COMBINED_BILL)
+                                },
                                 onNavigateNormalCalculator = {
                                     navController.navigate(Routes.NORMAL_CALCULATOR)
                                 },
@@ -118,6 +124,11 @@ class MainActivity : ComponentActivity() {
                             WeightToMoneyScreen(
                                 viewModel = w2mViewModel,
                                 shopProfile = prefs.shopProfile,
+                                billItems = billItems,
+                                onAddToBill = mainViewModel::addWeightItemToBill,
+                                onOpenCombinedBill = {
+                                    navController.navigate(Routes.COMBINED_BILL)
+                                },
                                 onBack = { navController.popBackStack() },
                                 onOpenReceipt = { calcId ->
                                     navController.navigate(Routes.receiptRoute(calcId))
@@ -130,10 +141,30 @@ class MainActivity : ComponentActivity() {
                             MoneyToWeightScreen(
                                 viewModel = m2wViewModel,
                                 shopProfile = prefs.shopProfile,
+                                billItems = billItems,
+                                onAddToBill = mainViewModel::addExactItemToBill,
+                                onOpenCombinedBill = {
+                                    navController.navigate(Routes.COMBINED_BILL)
+                                },
                                 onBack = { navController.popBackStack() },
                                 onOpenReceipt = { calcId ->
                                     navController.navigate(Routes.receiptRoute(calcId))
                                 }
+                            )
+                        }
+
+                        composable(Routes.COMBINED_BILL) {
+                            CombinedBillScreen(
+                                billItems = billItems,
+                                shopProfile = prefs.shopProfile,
+                                onAddItem = mainViewModel::addWeightItemToBill,
+                                onRemoveItem = mainViewModel::removeBillItem,
+                                onClearBill = mainViewModel::clearBillItems,
+                                onSaveBillToHistory = mainViewModel::saveCombinedBillToHistory,
+                                onOpenReceipt = { calcId ->
+                                    navController.navigate(Routes.receiptRoute(calcId))
+                                },
+                                onBack = { navController.popBackStack() }
                             )
                         }
 

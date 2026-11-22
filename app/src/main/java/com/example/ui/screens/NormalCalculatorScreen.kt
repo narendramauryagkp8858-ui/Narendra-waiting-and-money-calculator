@@ -145,13 +145,13 @@ fun NormalCalculatorScreen(
                                 val text = ReceiptFormatter.buildWhatsAppTextReceipt(
                                     existing, shopProfile, strings
                                 )
-                                ReceiptFormatter.shareText(context, text, strings.shareChooserTitle)
+                                ReceiptFormatter.shareDirectlyToWhatsApp(context, text, strings)
                             } else {
                                 viewModel.onEquals { saved ->
                                     val text = ReceiptFormatter.buildWhatsAppTextReceipt(
                                         saved, shopProfile, strings
                                     )
-                                    ReceiptFormatter.shareText(context, text, strings.shareChooserTitle)
+                                    ReceiptFormatter.shareDirectlyToWhatsApp(context, text, strings)
                                 }
                             }
                         },

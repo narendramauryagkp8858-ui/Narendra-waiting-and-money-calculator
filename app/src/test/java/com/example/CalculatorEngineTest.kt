@@ -86,4 +86,37 @@ class CalculatorEngineTest {
         assertTrue(text.contains("Narendra Weight & Money Calculator"))
         assertTrue(text.contains("₹25"))
     }
+
+    @Test
+    fun `combined bill totals sum multiple weights and amounts accurately`() {
+        val items = listOf(
+            com.example.domain.BillLineItem(
+                id = 1L,
+                itemName = "Loha",
+                pricePerKg = BigDecimal("80"),
+                weightInGrams = BigDecimal("1000"),
+                amount = BigDecimal("80")
+            ),
+            com.example.domain.BillLineItem(
+                id = 2L,
+                itemName = "Loha",
+                pricePerKg = BigDecimal("80"),
+                weightInGrams = BigDecimal("2000"),
+                amount = BigDecimal("160")
+            ),
+            com.example.domain.BillLineItem(
+                id = 3L,
+                itemName = "Loha",
+                pricePerKg = BigDecimal("80"),
+                weightInGrams = BigDecimal("500"),
+                amount = BigDecimal("40")
+            )
+        )
+        val totals = CalculatorEngine.calculateCombinedBillTotals(items)
+        assertEquals(0, BigDecimal("3500").compareTo(totals.totalWeightInGrams))
+        assertEquals(3L, totals.wholeKg)
+        assertEquals(0, BigDecimal("500").compareTo(totals.remainingGrams))
+        assertEquals(0, BigDecimal("280").compareTo(totals.totalAmount))
+        assertEquals("3 KG 500 Gram", CalculatorEngine.formatGramsHuman(totals.totalWeightInGrams, "KG", "Gram"))
+    }
 }

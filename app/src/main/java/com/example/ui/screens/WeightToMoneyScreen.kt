@@ -24,11 +24,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -46,6 +49,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,6 +62,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.ShopProfile
+import com.example.domain.BillLineItem
 import com.example.domain.CalculatorEngine
 import com.example.domain.WeightUnit
 import com.example.localization.LocalStrings
@@ -67,12 +72,16 @@ import com.example.ui.components.ResultDetailRow
 import com.example.ui.components.WhatsAppActionButton
 import com.example.ui.viewmodel.WeightToMoneyViewModel
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WeightToMoneyScreen(
     viewModel: WeightToMoneyViewModel,
     shopProfile: ShopProfile,
+    billItems: List<BillLineItem>,
+    onAddToBill: (itemName: String, pricePerKg: BigDecimal, weight: BigDecimal, unit: WeightUnit) -> Unit,
+    onOpenCombinedBill: () -> Unit,
     onBack: () -> Unit,
     onOpenReceipt: (Long) -> Unit
 ) {
@@ -82,12 +91,46 @@ fun WeightToMoneyScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    // Flush unsaved calculation automatically when leaving the screen
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.flushAutoSaveIfNeeded()
+        }
+    }
+
     Scaffold(
         topBar = {
             NarendraTopBar(
                 title = strings.weightToMoneyTitle,
                 onBack = onBack,
                 actions = {
+                    if (billItems.isNotEmpty()) {
+                        Surface(
+                            onClick = onOpenCombinedBill,
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .minimumInteractiveComponentSize()
+                                .testTag("w2m_top_bill_badge")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.AddShoppingCart,
+                                    contentDescription = strings.viewFullBill,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Badge {
+                                    Text("${billItems.size}")
+                                }
+                            }
+                        }
+                    }
                     IconButton(
                         onClick = { viewModel.reset() },
                         modifier = Modifier
@@ -120,6 +163,47 @@ fun WeightToMoneyScreen(
                     .navigationBarsPadding(),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // Active Combined Bill Quick Banner if items already added
+                AnimatedVisibility(visible = billItems.isNotEmpty()) {
+                    val totals = CalculatorEngine.calculateCombinedBillTotals(billItems)
+                    Card(
+                        onClick = onOpenCombinedBill,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "${strings.billItemsCount}: ${billItems.size}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    text = "${CalculatorEngine.formatGramsHuman(totals.totalWeightInGrams, strings.kgUnit, strings.gramUnit)} • ${CalculatorEngine.formatAmount(totals.totalAmount)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                            Text(
+                                text = strings.viewFullBill,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
                 // Input Card
                 Card(
                     shape = RoundedCornerShape(20.dp),
@@ -183,7 +267,6 @@ fun WeightToMoneyScreen(
                                 .testTag("w2m_weight_input")
                         )
 
-                        // Unit Selector
                         Text(
                             text = strings.selectWeightUnit,
                             style = MaterialTheme.typography.labelLarge,
@@ -231,7 +314,6 @@ fun WeightToMoneyScreen(
                             )
                         }
 
-                        // Quick Preset Weights
                         Text(
                             text = strings.quickWeights,
                             style = MaterialTheme.typography.labelMedium,
@@ -335,7 +417,7 @@ fun WeightToMoneyScreen(
                                                 modifier = Modifier.size(16.dp)
                                             )
                                             Text(
-                                                text = strings.savedToHistory,
+                                                text = strings.autoSavedLabel,
                                                 style = MaterialTheme.typography.labelMedium,
                                                 color = MaterialTheme.colorScheme.primary
                                             )
@@ -368,7 +450,40 @@ fun WeightToMoneyScreen(
                                     highlightValue = true
                                 )
 
-                                Spacer(modifier = Modifier.height(4.dp))
+                                // Add to Combined Multi-Weight Bill button
+                                Button(
+                                    onClick = {
+                                        viewModel.calculateAndSave {
+                                            onAddToBill(
+                                                state.itemName,
+                                                result.pricePerKg,
+                                                result.inputWeight,
+                                                result.inputUnit
+                                            )
+                                            viewModel.prepareForNextBatch()
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar(strings.addedToBill)
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.secondary,
+                                        contentColor = MaterialTheme.colorScheme.onSecondary
+                                    ),
+                                    shape = RoundedCornerShape(14.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .testTag("w2m_add_to_bill_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.AddShoppingCart,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(strings.addToBill)
+                                }
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -382,16 +497,16 @@ fun WeightToMoneyScreen(
                                                 val text = ReceiptFormatter.buildWhatsAppTextReceipt(
                                                     existing, shopProfile, strings
                                                 )
-                                                ReceiptFormatter.shareText(
-                                                    context, text, strings.shareChooserTitle
+                                                ReceiptFormatter.shareDirectlyToWhatsApp(
+                                                    context, text, strings
                                                 )
                                             } else {
                                                 viewModel.calculateAndSave { saved ->
                                                     val text = ReceiptFormatter.buildWhatsAppTextReceipt(
                                                         saved, shopProfile, strings
                                                     )
-                                                    ReceiptFormatter.shareText(
-                                                        context, text, strings.shareChooserTitle
+                                                    ReceiptFormatter.shareDirectlyToWhatsApp(
+                                                        context, text, strings
                                                     )
                                                 }
                                             }

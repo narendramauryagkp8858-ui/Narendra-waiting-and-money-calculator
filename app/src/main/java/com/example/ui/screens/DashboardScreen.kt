@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CurrencyRupee
@@ -79,6 +80,7 @@ import com.example.ui.theme.WhatsAppGreen
 fun DashboardScreen(
     shopProfile: ShopProfile,
     historyCount: Int,
+    billCount: Int,
     latestCalculation: CalculationEntity?,
     currentLanguage: AppLanguage,
     currentThemeMode: ThemeMode,
@@ -86,6 +88,7 @@ fun DashboardScreen(
     onToggleTheme: () -> Unit,
     onNavigateWeightToMoney: () -> Unit,
     onNavigateMoneyToWeight: () -> Unit,
+    onNavigateCombinedBill: () -> Unit,
     onNavigateNormalCalculator: () -> Unit,
     onNavigateHistory: () -> Unit,
     onNavigateShopProfile: () -> Unit,
@@ -332,6 +335,20 @@ fun DashboardScreen(
                                 )
                             }
                         }
+                    }
+
+                    // Multi-Weight Combined Bill Card (for Loha / multiple weights in 1 bill)
+                    item {
+                        PrimaryFeatureCard(
+                            title = if (billCount > 0) "${strings.combinedBillTitle} ($billCount)" else strings.combinedBillTitle,
+                            subtitle = strings.combinedBillDesc,
+                            icon = Icons.Filled.AddShoppingCart,
+                            accentColor = MaterialTheme.colorScheme.tertiary,
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            onClick = onNavigateCombinedBill,
+                            testTag = "menu_combined_bill",
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
 
                     // Secondary Grid: Normal Calculator & History

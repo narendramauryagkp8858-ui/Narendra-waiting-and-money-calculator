@@ -10,6 +10,7 @@ import java.util.Locale
 enum class CalculationType(val key: String) {
     WEIGHT_TO_MONEY("WEIGHT_TO_MONEY"),
     MONEY_TO_WEIGHT("MONEY_TO_WEIGHT"),
+    COMBINED_BILL("COMBINED_BILL"),
     NORMAL("NORMAL");
 
     companion object {
@@ -22,6 +23,22 @@ enum class WeightUnit {
     KG,
     GRAM
 }
+
+data class BillLineItem(
+    val id: Long,
+    val itemName: String,
+    val pricePerKg: BigDecimal,
+    val weightInGrams: BigDecimal,
+    val amount: BigDecimal
+)
+
+data class CombinedBillTotals(
+    val totalWeightInGrams: BigDecimal,
+    val wholeKg: Long,
+    val remainingGrams: BigDecimal,
+    val totalWeightInKg: BigDecimal,
+    val totalAmount: BigDecimal
+)
 
 data class WeightMoneyResult(
     val pricePerKg: BigDecimal,
@@ -171,14 +188,40 @@ object CalculatorEngine {
     }
 
     fun formatWeightHuman(result: MoneyWeightResult, kgLabel: String, gramLabel: String): String {
+        return formatGramsHuman(result.weightInGrams, kgLabel, gramLabel)
+    }
+
+    fun formatGramsHuman(totalGrams: BigDecimal, kgLabel: String, gramLabel: String): String {
+        val wholeKg = totalGrams.divideToIntegralValue(THOUSAND).toLong()
+        val remainingGrams = totalGrams.remainder(THOUSAND).setScale(2, RoundingMode.HALF_UP).stripTrailingZerosSafe()
         return when {
-            result.wholeKg > 0 && result.remainingGrams.compareTo(BigDecimal.ZERO) > 0 ->
-                "${result.wholeKg} $kgLabel ${formatPlainNumber(result.remainingGrams, 2)} $gramLabel"
-            result.wholeKg > 0 ->
-                "${result.wholeKg} $kgLabel"
+            wholeKg > 0 && remainingGrams.compareTo(BigDecimal.ZERO) > 0 ->
+                "$wholeKg $kgLabel ${formatPlainNumber(remainingGrams, 2)} $gramLabel"
+            wholeKg > 0 ->
+                "$wholeKg $kgLabel"
             else ->
-                "${formatPlainNumber(result.weightInGrams, 2)} $gramLabel"
+                "${formatPlainNumber(totalGrams, 2)} $gramLabel"
         }
+    }
+
+    fun calculateCombinedBillTotals(items: List<BillLineItem>): CombinedBillTotals {
+        val totalGrams = items.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.weightInGrams) }
+            .setScale(2, RoundingMode.HALF_UP)
+            .stripTrailingZerosSafe()
+        val wholeKg = totalGrams.divideToIntegralValue(THOUSAND).toLong()
+        val remainingGrams = totalGrams.remainder(THOUSAND).setScale(2, RoundingMode.HALF_UP).stripTrailingZerosSafe()
+        val totalKg = totalGrams.divide(THOUSAND, 3, RoundingMode.HALF_UP).stripTrailingZerosSafe()
+        val totalAmount = items.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.amount) }
+            .setScale(2, RoundingMode.HALF_UP)
+            .stripTrailingZerosSafe()
+
+        return CombinedBillTotals(
+            totalWeightInGrams = totalGrams,
+            wholeKg = wholeKg,
+            remainingGrams = remainingGrams,
+            totalWeightInKg = totalKg,
+            totalAmount = totalAmount
+        )
     }
 
     private fun BigDecimal.stripTrailingZerosSafe(): BigDecimal {
