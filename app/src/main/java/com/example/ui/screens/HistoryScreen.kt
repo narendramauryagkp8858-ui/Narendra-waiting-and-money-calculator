@@ -35,6 +35,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,9 +47,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -60,18 +66,22 @@ import com.example.ui.components.ConfirmClearHistoryDialog
 import com.example.ui.components.NarendraTopBar
 import com.example.ui.components.ResultDetailRow
 import com.example.ui.theme.WhatsAppGreen
+import kotlinx.coroutines.launch
 
 @Composable
 fun HistoryScreen(
     historyItems: List<CalculationEntity>,
     shopProfile: ShopProfile,
     onDeleteItem: (Long) -> Unit,
+    onRestoreItem: (CalculationEntity) -> Unit,
     onClearAll: () -> Unit,
     onOpenReceipt: (Long) -> Unit,
     onBack: () -> Unit
 ) {
     val strings = LocalStrings.current
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     var selectedFilter by remember { mutableStateOf<CalculationType?>(null) }
     var showClearDialog by remember { mutableStateOf(false) }
 
@@ -84,6 +94,7 @@ fun HistoryScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             NarendraTopBar(
                 title = strings.historyTitle,
@@ -111,7 +122,8 @@ fun HistoryScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -149,6 +161,12 @@ fun HistoryScreen(
                         onClick = { selectedFilter = CalculationType.MONEY_TO_WEIGHT },
                         label = { Text(strings.moneyToWeightTitle) },
                         modifier = Modifier.testTag("history_filter_m2w")
+                    )
+                    FilterChip(
+                        selected = selectedFilter == CalculationType.PIECE_TO_MONEY,
+                        onClick = { selectedFilter = CalculationType.PIECE_TO_MONEY },
+                        label = { Text(strings.pieceToMoneyTitle) },
+                        modifier = Modifier.testTag("history_filter_p2m")
                     )
                     FilterChip(
                         selected = selectedFilter == CalculationType.COMBINED_BILL,
@@ -214,7 +232,20 @@ fun HistoryScreen(
                         items(filteredItems, key = { it.id }) { item ->
                             HistoryItemCard(
                                 item = item,
-                                onDelete = { onDeleteItem(item.id) },
+                                onDelete = {
+                                    onDeleteItem(item.id)
+                                    scope.launch {
+                                        snackbarHostState.currentSnackbarData?.dismiss()
+                                        val res = snackbarHostState.showSnackbar(
+                                            message = strings.entryDeletedMsg,
+                                            actionLabel = strings.undo,
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        if (res == SnackbarResult.ActionPerformed) {
+                                            onRestoreItem(item)
+                                        }
+                                    }
+                                },
                                 onViewReceipt = { onOpenReceipt(item.id) },
                                 onShareWhatsApp = {
                                     val text = ReceiptFormatter.buildWhatsAppTextReceipt(
@@ -255,12 +286,14 @@ private fun HistoryItemCard(
     val badgeColor = when (calcType) {
         CalculationType.WEIGHT_TO_MONEY -> MaterialTheme.colorScheme.primaryContainer
         CalculationType.MONEY_TO_WEIGHT -> MaterialTheme.colorScheme.secondaryContainer
+        CalculationType.PIECE_TO_MONEY -> MaterialTheme.colorScheme.secondaryContainer
         CalculationType.COMBINED_BILL -> MaterialTheme.colorScheme.primaryContainer
         CalculationType.NORMAL -> MaterialTheme.colorScheme.tertiaryContainer
     }
     val badgeTextColor = when (calcType) {
         CalculationType.WEIGHT_TO_MONEY -> MaterialTheme.colorScheme.onPrimaryContainer
         CalculationType.MONEY_TO_WEIGHT -> MaterialTheme.colorScheme.onSecondaryContainer
+        CalculationType.PIECE_TO_MONEY -> MaterialTheme.colorScheme.onSecondaryContainer
         CalculationType.COMBINED_BILL -> MaterialTheme.colorScheme.onPrimaryContainer
         CalculationType.NORMAL -> MaterialTheme.colorScheme.onTertiaryContainer
     }
@@ -271,7 +304,7 @@ private fun HistoryItemCard(
             .fillMaxWidth()
             .testTag("history_card_${item.id}"),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
     ) {
         Column(
@@ -329,10 +362,16 @@ private fun HistoryItemCard(
             }
 
             if (item.ratePerKg.isNotBlank()) {
-                ResultDetailRow(label = strings.ratePerKgLabel, value = item.ratePerKg)
+                ResultDetailRow(
+                    label = ReceiptFormatter.rateFieldLabel(item.calculationType, strings),
+                    value = item.ratePerKg
+                )
             }
             if (item.weightDisplay.isNotBlank()) {
-                ResultDetailRow(label = strings.weightLabel, value = item.weightDisplay)
+                ResultDetailRow(
+                    label = ReceiptFormatter.quantityOrWeightFieldLabel(item.calculationType, strings),
+                    value = item.weightDisplay
+                )
             }
             if (item.amountDisplay.isNotBlank()) {
                 ResultDetailRow(label = strings.amountLabel, value = item.amountDisplay)

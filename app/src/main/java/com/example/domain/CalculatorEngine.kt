@@ -10,6 +10,7 @@ import java.util.Locale
 enum class CalculationType(val key: String) {
     WEIGHT_TO_MONEY("WEIGHT_TO_MONEY"),
     MONEY_TO_WEIGHT("MONEY_TO_WEIGHT"),
+    PIECE_TO_MONEY("PIECE_TO_MONEY"),
     COMBINED_BILL("COMBINED_BILL"),
     NORMAL("NORMAL");
 
@@ -24,11 +25,18 @@ enum class WeightUnit {
     GRAM
 }
 
+enum class BillItemMode {
+    WEIGHT,
+    PIECE
+}
+
 data class BillLineItem(
     val id: Long,
+    val mode: BillItemMode = BillItemMode.WEIGHT,
     val itemName: String,
     val pricePerKg: BigDecimal,
-    val weightInGrams: BigDecimal,
+    val weightInGrams: BigDecimal = BigDecimal.ZERO,
+    val pieceQuantity: BigDecimal = BigDecimal.ZERO,
     val amount: BigDecimal
 )
 
@@ -37,6 +45,15 @@ data class CombinedBillTotals(
     val wholeKg: Long,
     val remainingGrams: BigDecimal,
     val totalWeightInKg: BigDecimal,
+    val totalPieces: BigDecimal,
+    val weightItemCount: Int,
+    val pieceItemCount: Int,
+    val totalAmount: BigDecimal
+)
+
+data class PieceMoneyResult(
+    val pricePerPiece: BigDecimal,
+    val quantity: BigDecimal,
     val totalAmount: BigDecimal
 )
 
@@ -136,6 +153,25 @@ object CalculatorEngine {
             weightInKg = weightInKg.setScale(3, RoundingMode.HALF_UP).stripTrailingZerosSafe(),
             wholeKg = wholeKg,
             remainingGrams = remainingGrams.stripTrailingZerosSafe()
+        )
+    }
+
+    /**
+     * Amount = Quantity (Pieces) * Price per Piece
+     */
+    fun calculatePieceToMoney(
+        pricePerPiece: BigDecimal,
+        quantity: BigDecimal
+    ): PieceMoneyResult {
+        require(pricePerPiece > BigDecimal.ZERO) { "Price per piece must be greater than zero" }
+        require(quantity > BigDecimal.ZERO) { "Quantity must be greater than zero" }
+
+        val totalAmount = pricePerPiece.multiply(quantity).setScale(2, RoundingMode.HALF_UP)
+
+        return PieceMoneyResult(
+            pricePerPiece = pricePerPiece.stripTrailingZerosSafe(),
+            quantity = quantity.stripTrailingZerosSafe(),
+            totalAmount = totalAmount.stripTrailingZerosSafe()
         )
     }
 
@@ -346,12 +382,18 @@ object CalculatorEngine {
     }
 
     fun calculateCombinedBillTotals(items: List<BillLineItem>): CombinedBillTotals {
-        val totalGrams = items.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.weightInGrams) }
+        val weightItems = items.filter { it.mode == BillItemMode.WEIGHT }
+        val pieceItems = items.filter { it.mode == BillItemMode.PIECE }
+
+        val totalGrams = weightItems.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.weightInGrams) }
             .setScale(2, RoundingMode.HALF_UP)
             .stripTrailingZerosSafe()
         val wholeKg = totalGrams.divideToIntegralValue(THOUSAND).toLong()
         val remainingGrams = totalGrams.remainder(THOUSAND).setScale(2, RoundingMode.HALF_UP).stripTrailingZerosSafe()
         val totalKg = totalGrams.divide(THOUSAND, 3, RoundingMode.HALF_UP).stripTrailingZerosSafe()
+        val totalPieces = pieceItems.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.pieceQuantity) }
+            .setScale(3, RoundingMode.HALF_UP)
+            .stripTrailingZerosSafe()
         val totalAmount = items.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.amount) }
             .setScale(2, RoundingMode.HALF_UP)
             .stripTrailingZerosSafe()
@@ -361,6 +403,9 @@ object CalculatorEngine {
             wholeKg = wholeKg,
             remainingGrams = remainingGrams,
             totalWeightInKg = totalKg,
+            totalPieces = totalPieces,
+            weightItemCount = weightItems.size,
+            pieceItemCount = pieceItems.size,
             totalAmount = totalAmount
         )
     }

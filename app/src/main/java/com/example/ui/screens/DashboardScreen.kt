@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Scale
 import androidx.compose.material.icons.filled.Settings
@@ -88,6 +89,7 @@ fun DashboardScreen(
     onToggleTheme: () -> Unit,
     onNavigateWeightToMoney: () -> Unit,
     onNavigateMoneyToWeight: () -> Unit,
+    onNavigatePieceToMoney: () -> Unit,
     onNavigateCombinedBill: () -> Unit,
     onNavigateNormalCalculator: () -> Unit,
     onNavigateHistory: () -> Unit,
@@ -99,7 +101,7 @@ fun DashboardScreen(
     var showNoReceiptDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.Transparent
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -295,7 +297,7 @@ fun DashboardScreen(
                                     subtitle = strings.weightToMoneyDesc,
                                     icon = Icons.Filled.Scale,
                                     accentColor = MaterialTheme.colorScheme.primary,
-                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                                     onClick = onNavigateWeightToMoney,
                                     testTag = "menu_weight_to_money",
                                     modifier = Modifier.weight(1f)
@@ -305,7 +307,7 @@ fun DashboardScreen(
                                     subtitle = strings.moneyToWeightDesc,
                                     icon = Icons.Filled.CurrencyRupee,
                                     accentColor = MaterialTheme.colorScheme.secondary,
-                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                                     onClick = onNavigateMoneyToWeight,
                                     testTag = "menu_money_to_weight",
                                     modifier = Modifier.weight(1f)
@@ -318,7 +320,7 @@ fun DashboardScreen(
                                     subtitle = strings.weightToMoneyDesc,
                                     icon = Icons.Filled.Scale,
                                     accentColor = MaterialTheme.colorScheme.primary,
-                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                                     onClick = onNavigateWeightToMoney,
                                     testTag = "menu_weight_to_money",
                                     modifier = Modifier.fillMaxWidth()
@@ -328,7 +330,7 @@ fun DashboardScreen(
                                     subtitle = strings.moneyToWeightDesc,
                                     icon = Icons.Filled.CurrencyRupee,
                                     accentColor = MaterialTheme.colorScheme.secondary,
-                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                                     onClick = onNavigateMoneyToWeight,
                                     testTag = "menu_money_to_weight",
                                     modifier = Modifier.fillMaxWidth()
@@ -337,18 +339,58 @@ fun DashboardScreen(
                         }
                     }
 
-                    // Multi-Weight Combined Bill Card (for Loha / multiple weights in 1 bill)
+                    // Piece & Rate + Combined Bill (Weight & Piece)
                     item {
-                        PrimaryFeatureCard(
-                            title = if (billCount > 0) "${strings.combinedBillTitle} ($billCount)" else strings.combinedBillTitle,
-                            subtitle = strings.combinedBillDesc,
-                            icon = Icons.Filled.AddShoppingCart,
-                            accentColor = MaterialTheme.colorScheme.tertiary,
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            onClick = onNavigateCombinedBill,
-                            testTag = "menu_combined_bill",
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (isWide) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                PrimaryFeatureCard(
+                                    title = strings.pieceToMoneyTitle,
+                                    subtitle = strings.pieceToMoneyDesc,
+                                    icon = Icons.Filled.Inventory2,
+                                    accentColor = MaterialTheme.colorScheme.primary,
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                    onClick = onNavigatePieceToMoney,
+                                    testTag = "menu_piece_to_money",
+                                    modifier = Modifier.weight(1f)
+                                )
+                                PrimaryFeatureCard(
+                                    title = if (billCount > 0) "${strings.combinedBillTitle} ($billCount)" else strings.combinedBillTitle,
+                                    subtitle = strings.combinedBillDesc,
+                                    icon = Icons.Filled.AddShoppingCart,
+                                    accentColor = MaterialTheme.colorScheme.tertiary,
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                    onClick = onNavigateCombinedBill,
+                                    testTag = "menu_combined_bill",
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                PrimaryFeatureCard(
+                                    title = strings.pieceToMoneyTitle,
+                                    subtitle = strings.pieceToMoneyDesc,
+                                    icon = Icons.Filled.Inventory2,
+                                    accentColor = MaterialTheme.colorScheme.primary,
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                    onClick = onNavigatePieceToMoney,
+                                    testTag = "menu_piece_to_money",
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                PrimaryFeatureCard(
+                                    title = if (billCount > 0) "${strings.combinedBillTitle} ($billCount)" else strings.combinedBillTitle,
+                                    subtitle = strings.combinedBillDesc,
+                                    icon = Icons.Filled.AddShoppingCart,
+                                    accentColor = MaterialTheme.colorScheme.tertiary,
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                    onClick = onNavigateCombinedBill,
+                                    testTag = "menu_combined_bill",
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
                     }
 
                     // Secondary Grid: Normal Calculator & History
@@ -425,7 +467,7 @@ fun DashboardScreen(
                                 .testTag("menu_settings"),
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
                             ),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                         ) {
@@ -585,7 +627,7 @@ private fun CompactGridCard(
             .height(146.dp)
             .testTag(testTag),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
     ) {
         Column(

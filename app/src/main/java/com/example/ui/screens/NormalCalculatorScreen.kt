@@ -32,6 +32,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -68,7 +69,14 @@ fun NormalCalculatorScreen(
         displayScrollState.animateScrollTo(displayScrollState.maxValue)
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.flushAutoSaveIfNeeded()
+        }
+    }
+
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             NarendraTopBar(
                 title = strings.normalCalculatorTitle,
@@ -97,7 +105,7 @@ fun NormalCalculatorScreen(
                         .weight(1f),
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f)
                     ),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
                 ) {
@@ -313,7 +321,7 @@ fun NormalCalculatorScreen(
                     ) {
                         CalcKeyButton(
                             label = "00",
-                            containerColor = MaterialTheme.colorScheme.surface,
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             onClick = viewModel::onDoubleZero,
                             testTag = "calc_key_00",
@@ -321,7 +329,7 @@ fun NormalCalculatorScreen(
                         )
                         CalcKeyButton(
                             label = "0",
-                            containerColor = MaterialTheme.colorScheme.surface,
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             onClick = { viewModel.onDigit("0") },
                             testTag = "calc_key_0",
@@ -329,7 +337,7 @@ fun NormalCalculatorScreen(
                         )
                         CalcKeyButton(
                             label = ".",
-                            containerColor = MaterialTheme.colorScheme.surface,
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             onClick = viewModel::onDecimal,
                             testTag = "calc_key_dot",
@@ -365,7 +373,7 @@ private fun CalcNumberOperatorRow(
         nums.forEach { d ->
             CalcKeyButton(
                 label = d,
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 onClick = { onDigit(d) },
                 testTag = "calc_key_$d",

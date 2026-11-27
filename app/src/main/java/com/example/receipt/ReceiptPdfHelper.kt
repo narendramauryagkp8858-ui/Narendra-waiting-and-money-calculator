@@ -167,8 +167,8 @@ object ReceiptPdfHelper {
         if (calculation.itemName.isNotBlank()) {
             drawRow("Item", calculation.itemName)
         }
-        drawRow(strings.ratePerKgLabel, calculation.ratePerKg)
-        drawRow(strings.weightLabel, calculation.weightDisplay)
+        drawRow(ReceiptFormatter.rateFieldLabel(calculation.calculationType, strings), calculation.ratePerKg)
+        drawRow(ReceiptFormatter.quantityOrWeightFieldLabel(calculation.calculationType, strings), calculation.weightDisplay)
         drawRow(strings.amountLabel, calculation.amountDisplay)
 
         if (calculation.detailsSummary.isNotBlank()) {

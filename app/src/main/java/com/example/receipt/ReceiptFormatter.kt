@@ -22,8 +22,25 @@ object ReceiptFormatter {
         return when (CalculationType.fromKey(typeKey)) {
             CalculationType.WEIGHT_TO_MONEY -> strings.weightToMoneyTitle
             CalculationType.MONEY_TO_WEIGHT -> strings.moneyToWeightTitle
+            CalculationType.PIECE_TO_MONEY -> strings.pieceToMoneyTitle
             CalculationType.COMBINED_BILL -> strings.combinedBillTitle
             CalculationType.NORMAL -> strings.normalCalculatorTitle
+        }
+    }
+
+    fun rateFieldLabel(typeKey: String, strings: AppStrings): String {
+        return when (CalculationType.fromKey(typeKey)) {
+            CalculationType.PIECE_TO_MONEY -> strings.ratePerPieceLabel
+            CalculationType.COMBINED_BILL -> strings.rateLabel
+            else -> strings.ratePerKgLabel
+        }
+    }
+
+    fun quantityOrWeightFieldLabel(typeKey: String, strings: AppStrings): String {
+        return when (CalculationType.fromKey(typeKey)) {
+            CalculationType.PIECE_TO_MONEY -> strings.quantityLabel
+            CalculationType.COMBINED_BILL -> strings.weightOrQtyLabel
+            else -> strings.weightLabel
         }
     }
 
@@ -51,10 +68,10 @@ object ReceiptFormatter {
             sb.appendLine("Item: ${calculation.itemName}")
         }
         if (calculation.ratePerKg.isNotBlank()) {
-            sb.appendLine("${strings.ratePerKgLabel}: ${calculation.ratePerKg}")
+            sb.appendLine("${rateFieldLabel(calculation.calculationType, strings)}: ${calculation.ratePerKg}")
         }
         if (calculation.weightDisplay.isNotBlank()) {
-            sb.appendLine("${strings.weightLabel}: ${calculation.weightDisplay}")
+            sb.appendLine("${quantityOrWeightFieldLabel(calculation.calculationType, strings)}: ${calculation.weightDisplay}")
         }
         if (calculation.amountDisplay.isNotBlank()) {
             sb.appendLine("${strings.amountLabel}: ${calculation.amountDisplay}")

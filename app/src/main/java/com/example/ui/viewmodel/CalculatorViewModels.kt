@@ -8,6 +8,7 @@ import com.example.data.local.CalculationRepository
 import com.example.domain.CalculationType
 import com.example.domain.CalculatorEngine
 import com.example.domain.MoneyWeightResult
+import com.example.domain.PieceMoneyResult
 import com.example.domain.WeightMoneyResult
 import com.example.domain.WeightUnit
 import kotlinx.coroutines.Job
@@ -107,11 +108,12 @@ class WeightToMoneyViewModel(
 
     fun flushAutoSaveIfNeeded() {
         val state = _uiState.value
-        if (state.liveResult != null && buildSignature(state) != lastSavedSignature) {
+        val result = state.liveResult ?: return
+        val signature = buildSignature(state)
+        if (signature != lastSavedSignature) {
             autoSaveJob?.cancel()
-            viewModelScope.launch {
-                persistCurrentResult(state, state.liveResult)
-            }
+            lastSavedSignature = signature
+            repository.insertNonCancellable(buildEntity(state, result))
         }
     }
 
@@ -151,16 +153,10 @@ class WeightToMoneyViewModel(
         }
     }
 
-    private suspend fun persistCurrentResult(
+    private fun buildEntity(
         state: WeightToMoneyUiState,
         result: WeightMoneyResult
     ): CalculationEntity {
-        val signature = buildSignature(state)
-        val existing = state.savedRecord
-        if (existing != null && signature == lastSavedSignature) {
-            return existing
-        }
-
         val unitLabel = if (result.inputUnit == WeightUnit.KG) "KG" else "Gram"
         val gramsStr = CalculatorEngine.formatPlainNumber(result.weightInGrams, 2)
         val kgStr = CalculatorEngine.formatPlainNumber(result.weightInKg, 3)
@@ -172,7 +168,7 @@ class WeightToMoneyViewModel(
         }
         val finalAmountStr = CalculatorEngine.formatAmount(result.totalAmount)
 
-        val entity = CalculationEntity(
+        return CalculationEntity(
             id = activeSessionHistoryId ?: 0L,
             timestamp = System.currentTimeMillis(),
             calculationType = CalculationType.WEIGHT_TO_MONEY.key,
@@ -183,7 +179,19 @@ class WeightToMoneyViewModel(
             finalResult = finalAmountStr,
             detailsSummary = "${CalculatorEngine.formatPlainNumber(result.inputWeight, 3)} $unitLabel × $rateStr = $finalAmountStr"
         )
+    }
 
+    private suspend fun persistCurrentResult(
+        state: WeightToMoneyUiState,
+        result: WeightMoneyResult
+    ): CalculationEntity {
+        val signature = buildSignature(state)
+        val existing = state.savedRecord
+        if (existing != null && signature == lastSavedSignature) {
+            return existing
+        }
+
+        val entity = buildEntity(state, result)
         val insertedId = repository.insert(entity)
         activeSessionHistoryId = insertedId
         lastSavedSignature = signature
@@ -285,11 +293,12 @@ class MoneyToWeightViewModel(
 
     fun flushAutoSaveIfNeeded() {
         val state = _uiState.value
-        if (state.liveResult != null && buildSignature(state) != lastSavedSignature) {
+        val result = state.liveResult ?: return
+        val signature = buildSignature(state)
+        if (signature != lastSavedSignature) {
             autoSaveJob?.cancel()
-            viewModelScope.launch {
-                persistCurrentResult(state, state.liveResult)
-            }
+            lastSavedSignature = signature
+            repository.insertNonCancellable(buildEntity(state, result))
         }
     }
 
@@ -329,22 +338,16 @@ class MoneyToWeightViewModel(
         }
     }
 
-    private suspend fun persistCurrentResult(
+    private fun buildEntity(
         state: MoneyToWeightUiState,
         result: MoneyWeightResult
     ): CalculationEntity {
-        val signature = buildSignature(state)
-        val existing = state.savedRecord
-        if (existing != null && signature == lastSavedSignature) {
-            return existing
-        }
-
         val rateStr = "${CalculatorEngine.formatAmount(result.pricePerKg)} / KG"
         val amountStr = CalculatorEngine.formatAmount(result.customerAmount)
         val humanWeight = CalculatorEngine.formatWeightHuman(result, "KG", "Gram")
         val totalGramsStr = "${CalculatorEngine.formatPlainNumber(result.weightInGrams, 2)} g"
 
-        val entity = CalculationEntity(
+        return CalculationEntity(
             id = activeSessionHistoryId ?: 0L,
             timestamp = System.currentTimeMillis(),
             calculationType = CalculationType.MONEY_TO_WEIGHT.key,
@@ -355,7 +358,19 @@ class MoneyToWeightViewModel(
             finalResult = humanWeight,
             detailsSummary = "$amountStr ÷ $rateStr = $humanWeight ($totalGramsStr)"
         )
+    }
 
+    private suspend fun persistCurrentResult(
+        state: MoneyToWeightUiState,
+        result: MoneyWeightResult
+    ): CalculationEntity {
+        val signature = buildSignature(state)
+        val existing = state.savedRecord
+        if (existing != null && signature == lastSavedSignature) {
+            return existing
+        }
+
+        val entity = buildEntity(state, result)
         val insertedId = repository.insert(entity)
         activeSessionHistoryId = insertedId
         lastSavedSignature = signature
@@ -372,6 +387,187 @@ class MoneyToWeightViewModel(
         val amount = CalculatorEngine.parsePositiveDecimal(state.amountInput)
         val result = if (price != null && amount != null) {
             CalculatorEngine.calculateMoneyToWeight(price, amount)
+        } else {
+            null
+        }
+        return state.copy(
+            liveResult = result,
+            savedRecord = if (result == null) null else state.savedRecord
+        )
+    }
+}
+
+data class PieceToMoneyUiState(
+    val itemName: String = "",
+    val pricePerPieceInput: String = "",
+    val quantityInput: String = "",
+    val liveResult: PieceMoneyResult? = null,
+    val priceError: Boolean = false,
+    val quantityError: Boolean = false,
+    val savedRecord: CalculationEntity? = null
+)
+
+class PieceToMoneyViewModel(
+    private val repository: CalculationRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(PieceToMoneyUiState())
+    val uiState: StateFlow<PieceToMoneyUiState> = _uiState.asStateFlow()
+
+    private var autoSaveJob: Job? = null
+    private var activeSessionHistoryId: Long? = null
+    private var lastSavedSignature: String? = null
+
+    fun updateItemName(value: String) {
+        _uiState.update { it.copy(itemName = value) }
+        scheduleAutoSave()
+    }
+
+    fun updatePrice(value: String) {
+        val filtered = filterDecimalInput(value)
+        _uiState.update { state ->
+            val next = state.copy(pricePerPieceInput = filtered, priceError = false)
+            recalculate(next)
+        }
+        scheduleAutoSave()
+    }
+
+    fun updateQuantity(value: String) {
+        val filtered = filterDecimalInput(value)
+        _uiState.update { state ->
+            val next = state.copy(quantityInput = filtered, quantityError = false)
+            recalculate(next)
+        }
+        scheduleAutoSave()
+    }
+
+    fun applyQuickQuantity(qty: String) {
+        _uiState.update { state ->
+            val next = state.copy(quantityInput = qty, quantityError = false)
+            recalculate(next)
+        }
+        scheduleAutoSave()
+    }
+
+    fun reset() {
+        autoSaveJob?.cancel()
+        activeSessionHistoryId = null
+        lastSavedSignature = null
+        _uiState.value = PieceToMoneyUiState()
+    }
+
+    fun prepareForNextBatch() {
+        autoSaveJob?.cancel()
+        activeSessionHistoryId = null
+        lastSavedSignature = null
+        _uiState.update { state ->
+            state.copy(
+                itemName = "",
+                pricePerPieceInput = "",
+                quantityInput = "",
+                liveResult = null,
+                priceError = false,
+                quantityError = false,
+                savedRecord = null
+            )
+        }
+    }
+
+    fun flushAutoSaveIfNeeded() {
+        val state = _uiState.value
+        val result = state.liveResult ?: return
+        val signature = buildSignature(state)
+        if (signature != lastSavedSignature) {
+            autoSaveJob?.cancel()
+            lastSavedSignature = signature
+            repository.insertNonCancellable(buildEntity(state, result))
+        }
+    }
+
+    fun calculateAndSave(onSaved: (CalculationEntity) -> Unit = {}) {
+        val state = _uiState.value
+        val price = CalculatorEngine.parsePositiveDecimal(state.pricePerPieceInput)
+        val qty = CalculatorEngine.parsePositiveDecimal(state.quantityInput)
+
+        if (price == null || qty == null) {
+            _uiState.update {
+                it.copy(
+                    priceError = price == null,
+                    quantityError = qty == null
+                )
+            }
+            return
+        }
+
+        autoSaveJob?.cancel()
+        val result = CalculatorEngine.calculatePieceToMoney(price, qty)
+        viewModelScope.launch {
+            val saved = persistCurrentResult(state, result)
+            onSaved(saved)
+        }
+    }
+
+    private fun scheduleAutoSave() {
+        autoSaveJob?.cancel()
+        val state = _uiState.value
+        val result = state.liveResult ?: return
+        val signature = buildSignature(state)
+        if (signature == lastSavedSignature) return
+
+        autoSaveJob = viewModelScope.launch {
+            delay(650L)
+            persistCurrentResult(_uiState.value, result)
+        }
+    }
+
+    private fun buildEntity(
+        state: PieceToMoneyUiState,
+        result: PieceMoneyResult
+    ): CalculationEntity {
+        val qtyStr = CalculatorEngine.formatPlainNumber(result.quantity, 3)
+        val rateStr = "${CalculatorEngine.formatAmount(result.pricePerPiece)} / Piece"
+        val finalAmountStr = CalculatorEngine.formatAmount(result.totalAmount)
+
+        return CalculationEntity(
+            id = activeSessionHistoryId ?: 0L,
+            timestamp = System.currentTimeMillis(),
+            calculationType = CalculationType.PIECE_TO_MONEY.key,
+            itemName = state.itemName.trim(),
+            ratePerKg = rateStr,
+            weightDisplay = "$qtyStr Piece",
+            amountDisplay = finalAmountStr,
+            finalResult = finalAmountStr,
+            detailsSummary = "$qtyStr Piece × $rateStr = $finalAmountStr"
+        )
+    }
+
+    private suspend fun persistCurrentResult(
+        state: PieceToMoneyUiState,
+        result: PieceMoneyResult
+    ): CalculationEntity {
+        val signature = buildSignature(state)
+        val existing = state.savedRecord
+        if (existing != null && signature == lastSavedSignature) {
+            return existing
+        }
+
+        val entity = buildEntity(state, result)
+        val insertedId = repository.insert(entity)
+        activeSessionHistoryId = insertedId
+        lastSavedSignature = signature
+        val saved = entity.copy(id = insertedId)
+        _uiState.update { it.copy(liveResult = result, savedRecord = saved) }
+        return saved
+    }
+
+    private fun buildSignature(state: PieceToMoneyUiState): String =
+        "${state.pricePerPieceInput}|${state.quantityInput}|${state.itemName.trim()}"
+
+    private fun recalculate(state: PieceToMoneyUiState): PieceToMoneyUiState {
+        val price = CalculatorEngine.parsePositiveDecimal(state.pricePerPieceInput)
+        val qty = CalculatorEngine.parsePositiveDecimal(state.quantityInput)
+        val result = if (price != null && qty != null) {
+            CalculatorEngine.calculatePieceToMoney(price, qty)
         } else {
             null
         }
@@ -408,6 +604,9 @@ class NormalCalculatorViewModel(
     val uiState: StateFlow<NormalCalculatorUiState> = _uiState.asStateFlow()
 
     private val operators = setOf('+', '-', '×', '÷')
+    private var autoSaveJob: Job? = null
+    private var activeSessionHistoryId: Long? = null
+    private var lastSavedSignature: String? = null
 
     fun onDigit(digit: String) {
         _uiState.update { state ->
@@ -429,6 +628,7 @@ class NormalCalculatorViewModel(
             }
             buildStateFromExpression(nextExpr, state.lastSavedRecord)
         }
+        scheduleNormalAutoSave()
     }
 
     fun onDoubleZero() {
@@ -448,6 +648,7 @@ class NormalCalculatorViewModel(
             }
             buildStateFromExpression(nextExpr, state.lastSavedRecord)
         }
+        scheduleNormalAutoSave()
     }
 
     fun onDecimal() {
@@ -468,9 +669,14 @@ class NormalCalculatorViewModel(
             }
             buildStateFromExpression(nextExpr, state.lastSavedRecord)
         }
+        scheduleNormalAutoSave()
     }
 
     fun onClearAll() {
+        flushAutoSaveIfNeeded()
+        autoSaveJob?.cancel()
+        activeSessionHistoryId = null
+        lastSavedSignature = null
         _uiState.value = NormalCalculatorUiState()
     }
 
@@ -499,6 +705,7 @@ class NormalCalculatorViewModel(
             }
             buildStateFromExpression(nextExpr, state.lastSavedRecord)
         }
+        scheduleNormalAutoSave()
     }
 
     fun onOperator(op: String) {
@@ -534,6 +741,7 @@ class NormalCalculatorViewModel(
             }
             buildStateFromExpression(nextExpr, state.lastSavedRecord)
         }
+        scheduleNormalAutoSave()
     }
 
     fun onPercent() {
@@ -552,11 +760,18 @@ class NormalCalculatorViewModel(
             if (cleanBase.isEmpty()) return@update state
             buildStateFromExpression("$cleanBase%", state.lastSavedRecord)
         }
+        scheduleNormalAutoSave()
     }
 
     fun onEquals(onSaved: ((CalculationEntity) -> Unit)? = null) {
         val state = _uiState.value
         if (state.isError) return
+
+        // If already evaluated, return existing record for Share/Receipt without creating duplicates
+        if (state.justEvaluated && state.lastSavedRecord != null) {
+            onSaved?.invoke(state.lastSavedRecord)
+            return
+        }
 
         val raw = if (state.justEvaluated && state.finalResultDisplay.isNotEmpty()) {
             state.finalResultDisplay
@@ -572,6 +787,7 @@ class NormalCalculatorViewModel(
 
         val res = CalculatorEngine.evaluateExpression(evalExpr, allowTrailingOperator = false)
         if (res.isFailure) {
+            autoSaveJob?.cancel()
             _uiState.update {
                 it.copy(
                     evaluatedHeader = evalExpr,
@@ -587,6 +803,7 @@ class NormalCalculatorViewModel(
         val finalValue = res.getOrNull() ?: return
         val finalStr = CalculatorEngine.formatPlainNumber(finalValue, 8)
 
+        autoSaveJob?.cancel()
         _uiState.update {
             it.copy(
                 expression = finalStr,
@@ -598,7 +815,49 @@ class NormalCalculatorViewModel(
             )
         }
 
-        saveNormalHistory(evalExpr, finalStr, onSaved)
+        saveNormalHistory(evalExpr, finalStr, finalizeSession = true, onSaved = onSaved)
+    }
+
+    fun flushAutoSaveIfNeeded() {
+        val state = _uiState.value
+        if (state.isError || state.justEvaluated) return
+        val preview = state.livePreview
+        if (preview.isEmpty()) return
+
+        val effectiveExpr = state.expression.trim().trimEnd { it == ' ' || it in operators }
+        if (effectiveExpr.isEmpty()) return
+
+        val signature = "$effectiveExpr=$preview"
+        if (signature != lastSavedSignature) {
+            autoSaveJob?.cancel()
+            lastSavedSignature = signature
+            repository.insertNonCancellable(
+                CalculationEntity(
+                    id = activeSessionHistoryId ?: 0L,
+                    timestamp = System.currentTimeMillis(),
+                    calculationType = CalculationType.NORMAL.key,
+                    finalResult = preview,
+                    detailsSummary = "$effectiveExpr = $preview"
+                )
+            )
+        }
+    }
+
+    private fun scheduleNormalAutoSave() {
+        autoSaveJob?.cancel()
+        val state = _uiState.value
+        if (state.isError || state.justEvaluated || state.livePreview.isEmpty()) return
+        val effectiveExpr = state.expression.trim().trimEnd { it == ' ' || it in operators }
+        if (effectiveExpr.isEmpty()) return
+
+        val preview = state.livePreview
+        val signature = "$effectiveExpr=$preview"
+        if (signature == lastSavedSignature) return
+
+        autoSaveJob = viewModelScope.launch {
+            delay(650L)
+            saveNormalHistory(effectiveExpr, preview, finalizeSession = false, onSaved = null)
+        }
     }
 
     private fun buildStateFromExpression(
@@ -643,9 +902,22 @@ class NormalCalculatorViewModel(
     private fun saveNormalHistory(
         expression: String,
         resultStr: String,
+        finalizeSession: Boolean,
         onSaved: ((CalculationEntity) -> Unit)?
     ) {
+        val signature = "$expression=$resultStr"
+        val currentSaved = _uiState.value.lastSavedRecord
+        if (signature == lastSavedSignature && currentSaved != null && activeSessionHistoryId != null) {
+            if (finalizeSession) {
+                activeSessionHistoryId = null
+                lastSavedSignature = null
+            }
+            onSaved?.invoke(currentSaved)
+            return
+        }
+
         val entity = CalculationEntity(
+            id = activeSessionHistoryId ?: 0L,
             timestamp = System.currentTimeMillis(),
             calculationType = CalculationType.NORMAL.key,
             finalResult = resultStr,
@@ -654,6 +926,13 @@ class NormalCalculatorViewModel(
         viewModelScope.launch {
             val id = repository.insert(entity)
             val saved = entity.copy(id = id)
+            if (finalizeSession) {
+                activeSessionHistoryId = null
+                lastSavedSignature = null
+            } else {
+                activeSessionHistoryId = id
+                lastSavedSignature = signature
+            }
             _uiState.update { it.copy(lastSavedRecord = saved) }
             onSaved?.invoke(saved)
         }
@@ -685,6 +964,8 @@ class CalculatorViewModelFactory(
                 WeightToMoneyViewModel(repository) as T
             modelClass.isAssignableFrom(MoneyToWeightViewModel::class.java) ->
                 MoneyToWeightViewModel(repository) as T
+            modelClass.isAssignableFrom(PieceToMoneyViewModel::class.java) ->
+                PieceToMoneyViewModel(repository) as T
             modelClass.isAssignableFrom(NormalCalculatorViewModel::class.java) ->
                 NormalCalculatorViewModel(repository) as T
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

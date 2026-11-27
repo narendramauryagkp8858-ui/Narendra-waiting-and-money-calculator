@@ -55,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -99,6 +100,7 @@ fun WeightToMoneyScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             NarendraTopBar(
                 title = strings.weightToMoneyTitle,
@@ -166,6 +168,16 @@ fun WeightToMoneyScreen(
                 // Active Combined Bill Quick Banner if items already added
                 AnimatedVisibility(visible = billItems.isNotEmpty()) {
                     val totals = CalculatorEngine.calculateCombinedBillTotals(billItems)
+                    val summaryParts = buildList {
+                        if (totals.weightItemCount > 0) {
+                            add(CalculatorEngine.formatGramsHuman(totals.totalWeightInGrams, strings.kgUnit, strings.gramUnit))
+                        }
+                        if (totals.pieceItemCount > 0) {
+                            add("${CalculatorEngine.formatPlainNumber(totals.totalPieces, 3)} ${strings.piecesPlural}")
+                        }
+                        add(CalculatorEngine.formatAmount(totals.totalAmount))
+                    }.joinToString(" • ")
+
                     Card(
                         onClick = onOpenCombinedBill,
                         shape = RoundedCornerShape(16.dp),
@@ -189,7 +201,7 @@ fun WeightToMoneyScreen(
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                                 Text(
-                                    text = "${CalculatorEngine.formatGramsHuman(totals.totalWeightInGrams, strings.kgUnit, strings.gramUnit)} • ${CalculatorEngine.formatAmount(totals.totalAmount)}",
+                                    text = summaryParts,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
@@ -207,7 +219,7 @@ fun WeightToMoneyScreen(
                 // Input Card
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
                 ) {
                     Column(

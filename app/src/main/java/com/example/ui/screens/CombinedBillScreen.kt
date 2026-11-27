@@ -54,6 +54,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +63,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.data.local.CalculationEntity
 import com.example.data.local.ShopProfile
+import com.example.domain.BillItemMode
 import com.example.domain.BillLineItem
 import com.example.domain.CalculatorEngine
 import com.example.domain.WeightUnit
@@ -78,10 +80,11 @@ import java.math.BigDecimal
 fun CombinedBillScreen(
     billItems: List<BillLineItem>,
     shopProfile: ShopProfile,
-    onAddItem: (itemName: String, pricePerKg: BigDecimal, weight: BigDecimal, unit: WeightUnit) -> Unit,
+    onAddWeightItem: (itemName: String, pricePerKg: BigDecimal, weight: BigDecimal, unit: WeightUnit) -> Unit,
+    onAddPieceItem: (itemName: String, pricePerPiece: BigDecimal, quantity: BigDecimal) -> Unit,
     onRemoveItem: (Long) -> Unit,
     onClearBill: () -> Unit,
-    onSaveBillToHistory: (kgLabel: String, gramLabel: String, onSaved: (CalculationEntity) -> Unit) -> Unit,
+    onSaveBillToHistory: (kgLabel: String, gramLabel: String, pieceLabel: String, onSaved: (CalculationEntity) -> Unit) -> Unit,
     onOpenReceipt: (Long) -> Unit,
     onBack: () -> Unit
 ) {
@@ -90,18 +93,20 @@ fun CombinedBillScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    var entryMode by remember { mutableStateOf(BillItemMode.WEIGHT) }
     var itemName by remember { mutableStateOf("") }
     var priceInput by remember { mutableStateOf("") }
-    var weightInput by remember { mutableStateOf("") }
+    var weightOrQtyInput by remember { mutableStateOf("") }
     var selectedUnit by remember { mutableStateOf(WeightUnit.KG) }
     var priceError by remember { mutableStateOf(false) }
-    var weightError by remember { mutableStateOf(false) }
+    var qtyOrWeightError by remember { mutableStateOf(false) }
 
     val totals = remember(billItems) {
         CalculatorEngine.calculateCombinedBillTotals(billItems)
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             NarendraTopBar(
                 title = strings.combinedBillTitle,
@@ -148,7 +153,7 @@ fun CombinedBillScreen(
                 item {
                     Card(
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
                     ) {
                         Column(
@@ -157,6 +162,45 @@ fun CombinedBillScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
+                            // Mode Switch: By Weight vs By Piece
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = entryMode == BillItemMode.WEIGHT,
+                                    onClick = {
+                                        if (entryMode != BillItemMode.WEIGHT) {
+                                            entryMode = BillItemMode.WEIGHT
+                                            weightOrQtyInput = ""
+                                            priceError = false
+                                            qtyOrWeightError = false
+                                        }
+                                    },
+                                    label = { Text(strings.byWeightTab) },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("bill_mode_weight")
+                                )
+                                FilterChip(
+                                    selected = entryMode == BillItemMode.PIECE,
+                                    onClick = {
+                                        if (entryMode != BillItemMode.PIECE) {
+                                            entryMode = BillItemMode.PIECE
+                                            weightOrQtyInput = ""
+                                            priceError = false
+                                            qtyOrWeightError = false
+                                        }
+                                    },
+                                    label = { Text(strings.byPieceTab) },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("bill_mode_piece")
+                                )
+                            }
+
                             OutlinedTextField(
                                 value = itemName,
                                 onValueChange = { itemName = it },
@@ -178,7 +222,15 @@ fun CombinedBillScreen(
                                         priceInput = filterDecimal(raw)
                                         priceError = false
                                     },
-                                    label = { Text(strings.productPricePerKg) },
+                                    label = {
+                                        Text(
+                                            if (entryMode == BillItemMode.WEIGHT) {
+                                                strings.productPricePerKg
+                                            } else {
+                                                strings.pricePerPieceLabel
+                                            }
+                                        )
+                                    },
                                     prefix = { Text("₹ ") },
                                     isError = priceError,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -188,13 +240,21 @@ fun CombinedBillScreen(
                                         .testTag("bill_price_input")
                                 )
                                 OutlinedTextField(
-                                    value = weightInput,
+                                    value = weightOrQtyInput,
                                     onValueChange = { raw ->
-                                        weightInput = filterDecimal(raw)
-                                        weightError = false
+                                        weightOrQtyInput = filterDecimal(raw)
+                                        qtyOrWeightError = false
                                     },
-                                    label = { Text(strings.enterWeight) },
-                                    isError = weightError,
+                                    label = {
+                                        Text(
+                                            if (entryMode == BillItemMode.WEIGHT) {
+                                                strings.enterWeight
+                                            } else {
+                                                strings.enterPiecesLabel
+                                            }
+                                        )
+                                    },
+                                    isError = qtyOrWeightError,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                     singleLine = true,
                                     modifier = Modifier
@@ -203,58 +263,79 @@ fun CombinedBillScreen(
                                 )
                             }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = selectedUnit == WeightUnit.KG,
-                                    onClick = { selectedUnit = WeightUnit.KG },
-                                    label = { Text(strings.kgUnit) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                                FilterChip(
-                                    selected = selectedUnit == WeightUnit.GRAM,
-                                    onClick = { selectedUnit = WeightUnit.GRAM },
-                                    label = { Text(strings.gramUnit) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                listOf(
-                                    Triple("250g", "250", WeightUnit.GRAM),
-                                    Triple("500g", "500", WeightUnit.GRAM),
-                                    Triple("1 KG", "1", WeightUnit.KG),
-                                    Triple("2 KG", "2", WeightUnit.KG),
-                                    Triple("5 KG", "5", WeightUnit.KG)
-                                ).forEach { (label, valStr, unit) ->
-                                    AssistChip(
-                                        onClick = {
-                                            weightInput = valStr
-                                            selectedUnit = unit
-                                            weightError = false
-                                        },
-                                        label = { Text(label) }
+                            if (entryMode == BillItemMode.WEIGHT) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    FilterChip(
+                                        selected = selectedUnit == WeightUnit.KG,
+                                        onClick = { selectedUnit = WeightUnit.KG },
+                                        label = { Text(strings.kgUnit) },
+                                        modifier = Modifier.weight(1f)
                                     )
+                                    FilterChip(
+                                        selected = selectedUnit == WeightUnit.GRAM,
+                                        onClick = { selectedUnit = WeightUnit.GRAM },
+                                        label = { Text(strings.gramUnit) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    listOf(
+                                        Triple("250g", "250", WeightUnit.GRAM),
+                                        Triple("500g", "500", WeightUnit.GRAM),
+                                        Triple("1 KG", "1", WeightUnit.KG),
+                                        Triple("2 KG", "2", WeightUnit.KG),
+                                        Triple("5 KG", "5", WeightUnit.KG)
+                                    ).forEach { (label, valStr, unit) ->
+                                        AssistChip(
+                                            onClick = {
+                                                weightOrQtyInput = valStr
+                                                selectedUnit = unit
+                                                qtyOrWeightError = false
+                                            },
+                                            label = { Text(label) }
+                                        )
+                                    }
+                                }
+                            } else {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    listOf("1", "2", "5", "10", "12", "24").forEach { qty ->
+                                        AssistChip(
+                                            onClick = {
+                                                weightOrQtyInput = qty
+                                                qtyOrWeightError = false
+                                            },
+                                            label = { Text("$qty ${strings.pieceUnit}") }
+                                        )
+                                    }
                                 }
                             }
 
                             Button(
                                 onClick = {
                                     val price = CalculatorEngine.parsePositiveDecimal(priceInput)
-                                    val weight = CalculatorEngine.parsePositiveDecimal(weightInput)
-                                    if (price == null || weight == null) {
+                                    val value = CalculatorEngine.parsePositiveDecimal(weightOrQtyInput)
+                                    if (price == null || value == null) {
                                         priceError = price == null
-                                        weightError = weight == null
+                                        qtyOrWeightError = value == null
                                         return@Button
                                     }
-                                    onAddItem(itemName, price, weight, selectedUnit)
-                                    // Keep price & itemName so next weight (e.g. 2kg after 1kg) is 1 tap!
-                                    weightInput = ""
+                                    if (entryMode == BillItemMode.WEIGHT) {
+                                        onAddWeightItem(itemName, price, value, selectedUnit)
+                                    } else {
+                                        onAddPieceItem(itemName, price, value)
+                                        // Clear itemName and price for next distinct piece product if needed
+                                    }
+                                    weightOrQtyInput = ""
                                     scope.launch {
                                         snackbarHostState.showSnackbar(strings.addedToBill)
                                     }
@@ -310,17 +391,27 @@ fun CombinedBillScreen(
                     }
                 } else {
                     itemsIndexed(billItems, key = { _, item -> item.id }) { index, lineItem ->
-                        val weightHuman = CalculatorEngine.formatGramsHuman(
-                            lineItem.weightInGrams,
-                            strings.kgUnit,
-                            strings.gramUnit
-                        )
-                        val rateText = "${CalculatorEngine.formatAmount(lineItem.pricePerKg)} / KG"
+                        val lineDetailText = when (lineItem.mode) {
+                            BillItemMode.WEIGHT -> {
+                                val weightHuman = CalculatorEngine.formatGramsHuman(
+                                    lineItem.weightInGrams,
+                                    strings.kgUnit,
+                                    strings.gramUnit
+                                )
+                                val rateText = "${CalculatorEngine.formatAmount(lineItem.pricePerKg)} / KG"
+                                "$weightHuman × $rateText"
+                            }
+                            BillItemMode.PIECE -> {
+                                val qtyText = "${CalculatorEngine.formatPlainNumber(lineItem.pieceQuantity, 3)} ${strings.pieceUnit}"
+                                val rateText = "${CalculatorEngine.formatAmount(lineItem.pricePerKg)} / ${strings.pieceUnit}"
+                                "$qtyText × $rateText"
+                            }
+                        }
                         val amountText = CalculatorEngine.formatAmount(lineItem.amount)
 
                         Card(
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                         ) {
                             Row(
@@ -331,7 +422,11 @@ fun CombinedBillScreen(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    color = if (lineItem.mode == BillItemMode.PIECE) {
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    },
                                     modifier = Modifier.size(34.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
@@ -339,7 +434,11 @@ fun CombinedBillScreen(
                                             text = "#${index + 1}",
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            color = if (lineItem.mode == BillItemMode.PIECE) {
+                                                MaterialTheme.colorScheme.onSecondaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                            }
                                         )
                                     }
                                 }
@@ -353,7 +452,7 @@ fun CombinedBillScreen(
                                         )
                                     }
                                     Text(
-                                        text = "$weightHuman × $rateText",
+                                        text = lineDetailText,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -387,6 +486,7 @@ fun CombinedBillScreen(
                             strings.gramUnit
                         )
                         val totalKgText = "${CalculatorEngine.formatPlainNumber(totals.totalWeightInKg, 3)} KG"
+                        val totalPiecesText = "${CalculatorEngine.formatPlainNumber(totals.totalPieces, 3)} ${strings.piecesPlural}"
                         val grandTotalText = CalculatorEngine.formatAmount(totals.totalAmount)
 
                         Card(
@@ -420,18 +520,27 @@ fun CombinedBillScreen(
                                     label = strings.billItemsCount,
                                     value = "${billItems.size}"
                                 )
-                                ResultDetailRow(
-                                    label = strings.totalWeightLabel,
-                                    value = "$totalWeightText ($totalKgText)",
-                                    highlightValue = true
-                                )
+                                if (totals.weightItemCount > 0) {
+                                    ResultDetailRow(
+                                        label = strings.totalWeightLabel,
+                                        value = "$totalWeightText ($totalKgText)",
+                                        highlightValue = totals.pieceItemCount == 0
+                                    )
+                                }
+                                if (totals.pieceItemCount > 0) {
+                                    ResultDetailRow(
+                                        label = strings.totalPiecesLabel,
+                                        value = totalPiecesText,
+                                        highlightValue = totals.weightItemCount == 0
+                                    )
+                                }
 
                                 Spacer(modifier = Modifier.height(4.dp))
 
                                 WhatsAppActionButton(
                                     text = strings.saveAndShareWhatsApp,
                                     onClick = {
-                                        onSaveBillToHistory(strings.kgUnit, strings.gramUnit) { saved ->
+                                        onSaveBillToHistory(strings.kgUnit, strings.gramUnit, strings.pieceUnit) { saved ->
                                             val receiptText = ReceiptFormatter.buildWhatsAppTextReceipt(
                                                 saved, shopProfile, strings
                                             )
@@ -448,7 +557,7 @@ fun CombinedBillScreen(
 
                                 OutlinedButton(
                                     onClick = {
-                                        onSaveBillToHistory(strings.kgUnit, strings.gramUnit) { saved ->
+                                        onSaveBillToHistory(strings.kgUnit, strings.gramUnit, strings.pieceUnit) { saved ->
                                             onOpenReceipt(saved.id)
                                         }
                                     },

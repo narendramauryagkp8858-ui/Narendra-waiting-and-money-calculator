@@ -115,6 +115,7 @@ fun ReceiptScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             NarendraTopBar(
                 title = strings.receiptTitle,
@@ -166,7 +167,7 @@ fun ReceiptScreen(
                         Card(
                             shape = RoundedCornerShape(20.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)
                             ),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -258,10 +259,16 @@ fun ReceiptScreen(
                                         ResultDetailRow(label = "Item", value = calc.itemName)
                                     }
                                     if (calc.ratePerKg.isNotBlank()) {
-                                        ResultDetailRow(label = strings.ratePerKgLabel, value = calc.ratePerKg)
+                                        ResultDetailRow(
+                                            label = ReceiptFormatter.rateFieldLabel(calc.calculationType, strings),
+                                            value = calc.ratePerKg
+                                        )
                                     }
                                     if (calc.weightDisplay.isNotBlank()) {
-                                        ResultDetailRow(label = strings.weightLabel, value = calc.weightDisplay)
+                                        ResultDetailRow(
+                                            label = ReceiptFormatter.quantityOrWeightFieldLabel(calc.calculationType, strings),
+                                            value = calc.weightDisplay
+                                        )
                                     }
                                     if (calc.amountDisplay.isNotBlank()) {
                                         ResultDetailRow(label = strings.amountLabel, value = calc.amountDisplay)

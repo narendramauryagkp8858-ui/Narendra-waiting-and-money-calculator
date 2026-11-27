@@ -80,7 +80,7 @@ fun NarendraTopBar(
         },
         actions = { actions() },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
+            containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.86f),
             titleContentColor = MaterialTheme.colorScheme.onBackground
         )
     )

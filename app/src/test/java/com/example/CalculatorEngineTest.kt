@@ -2,6 +2,8 @@ package com.example
 
 import com.example.data.local.CalculationEntity
 import com.example.data.local.ShopProfile
+import com.example.domain.BillItemMode
+import com.example.domain.BillLineItem
 import com.example.domain.CalculationType
 import com.example.domain.CalculatorEngine
 import com.example.domain.WeightUnit
@@ -139,5 +141,51 @@ class CalculatorEngineTest {
 
         val divZero = CalculatorEngine.evaluateExpression("50 ÷ 0")
         assertTrue(divZero.isFailure)
+    }
+
+    @Test
+    fun `piece to money calculates exact amount for quantity and rate`() {
+        val result = CalculatorEngine.calculatePieceToMoney(
+            pricePerPiece = BigDecimal("45.50"),
+            quantity = BigDecimal("6")
+        )
+        assertEquals(0, BigDecimal("273").compareTo(result.totalAmount))
+        assertEquals("₹273", CalculatorEngine.formatAmount(result.totalAmount))
+    }
+
+    @Test
+    fun `combined bill totals sum both weight and piece items accurately`() {
+        val items = listOf(
+            BillLineItem(
+                id = 1L,
+                mode = BillItemMode.WEIGHT,
+                itemName = "Loha",
+                pricePerKg = BigDecimal("80"),
+                weightInGrams = BigDecimal("1500"),
+                amount = BigDecimal("120")
+            ),
+            BillLineItem(
+                id = 2L,
+                mode = BillItemMode.PIECE,
+                itemName = "Nut Bolt",
+                pricePerKg = BigDecimal("15"),
+                pieceQuantity = BigDecimal("4"),
+                amount = BigDecimal("60")
+            ),
+            BillLineItem(
+                id = 3L,
+                mode = BillItemMode.PIECE,
+                itemName = "Washer",
+                pricePerKg = BigDecimal("5"),
+                pieceQuantity = BigDecimal("6"),
+                amount = BigDecimal("30")
+            )
+        )
+        val totals = CalculatorEngine.calculateCombinedBillTotals(items)
+        assertEquals(1, totals.weightItemCount)
+        assertEquals(2, totals.pieceItemCount)
+        assertEquals(0, BigDecimal("1500").compareTo(totals.totalWeightInGrams))
+        assertEquals(0, BigDecimal("10").compareTo(totals.totalPieces))
+        assertEquals(0, BigDecimal("210").compareTo(totals.totalAmount))
     }
 }

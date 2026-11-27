@@ -23,16 +23,19 @@ import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.HistoryScreen
 import com.example.ui.screens.MoneyToWeightScreen
 import com.example.ui.screens.NormalCalculatorScreen
+import com.example.ui.screens.PieceToMoneyScreen
 import com.example.ui.screens.ReceiptScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.ShopProfileScreen
 import com.example.ui.screens.SplashScreen
 import com.example.ui.screens.WeightToMoneyScreen
 import com.example.ui.theme.NarendraCalculatorTheme
+import com.example.ui.theme.ThemedWatermarkBackground
 import com.example.ui.viewmodel.CalculatorViewModelFactory
 import com.example.ui.viewmodel.MainViewModel
 import com.example.ui.viewmodel.MoneyToWeightViewModel
 import com.example.ui.viewmodel.NormalCalculatorViewModel
+import com.example.ui.viewmodel.PieceToMoneyViewModel
 import com.example.ui.viewmodel.WeightToMoneyViewModel
 
 class MainActivity : ComponentActivity() {
@@ -51,12 +54,13 @@ class MainActivity : ComponentActivity() {
 
             NarendraCalculatorTheme(themeMode = prefs.themeMode) {
                 CompositionLocalProvider(LocalStrings provides strings) {
-                    val navController = rememberNavController()
+                    ThemedWatermarkBackground {
+                        val navController = rememberNavController()
 
-                    NavHost(
-                        navController = navController,
-                        startDestination = Routes.SPLASH
-                    ) {
+                        NavHost(
+                            navController = navController,
+                            startDestination = Routes.SPLASH
+                        ) {
                         composable(Routes.SPLASH) {
                             SplashScreen(
                                 onFinished = {
@@ -97,6 +101,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onNavigateMoneyToWeight = {
                                     navController.navigate(Routes.MONEY_TO_WEIGHT)
+                                },
+                                onNavigatePieceToMoney = {
+                                    navController.navigate(Routes.PIECE_TO_MONEY)
                                 },
                                 onNavigateCombinedBill = {
                                     navController.navigate(Routes.COMBINED_BILL)
@@ -153,11 +160,29 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
+                        composable(Routes.PIECE_TO_MONEY) {
+                            val p2mViewModel: PieceToMoneyViewModel = viewModel(factory = calcFactory)
+                            PieceToMoneyScreen(
+                                viewModel = p2mViewModel,
+                                shopProfile = prefs.shopProfile,
+                                billItems = billItems,
+                                onAddToBill = mainViewModel::addPieceItemToBill,
+                                onOpenCombinedBill = {
+                                    navController.navigate(Routes.COMBINED_BILL)
+                                },
+                                onBack = { navController.popBackStack() },
+                                onOpenReceipt = { calcId ->
+                                    navController.navigate(Routes.receiptRoute(calcId))
+                                }
+                            )
+                        }
+
                         composable(Routes.COMBINED_BILL) {
                             CombinedBillScreen(
                                 billItems = billItems,
                                 shopProfile = prefs.shopProfile,
-                                onAddItem = mainViewModel::addWeightItemToBill,
+                                onAddWeightItem = mainViewModel::addWeightItemToBill,
+                                onAddPieceItem = mainViewModel::addPieceItemToBill,
                                 onRemoveItem = mainViewModel::removeBillItem,
                                 onClearBill = mainViewModel::clearBillItems,
                                 onSaveBillToHistory = mainViewModel::saveCombinedBillToHistory,
@@ -185,6 +210,7 @@ class MainActivity : ComponentActivity() {
                                 historyItems = history,
                                 shopProfile = prefs.shopProfile,
                                 onDeleteItem = mainViewModel::deleteHistoryItem,
+                                onRestoreItem = mainViewModel::restoreHistoryItem,
                                 onClearAll = mainViewModel::clearAllHistory,
                                 onOpenReceipt = { calcId ->
                                     navController.navigate(Routes.receiptRoute(calcId))
@@ -235,6 +261,7 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+                    }
                     }
                 }
             }
