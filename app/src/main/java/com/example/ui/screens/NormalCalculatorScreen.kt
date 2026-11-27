@@ -51,6 +51,8 @@ import com.example.receipt.ReceiptFormatter
 import com.example.ui.components.NarendraTopBar
 import com.example.ui.components.WhatsAppActionButton
 import com.example.ui.theme.JetBrainsMonoFamily
+import com.example.ui.theme.translucentCardBorderColor
+import com.example.ui.theme.translucentCardSurfaceColor
 import com.example.ui.viewmodel.NormalCalculatorViewModel
 
 @Composable
@@ -105,9 +107,10 @@ fun NormalCalculatorScreen(
                         .weight(1f),
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f)
+                        containerColor = translucentCardSurfaceColor(lightAlpha = 0.56f, darkAlpha = 0.52f)
                     ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
+                    border = BorderStroke(1.dp, translucentCardBorderColor()),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -321,7 +324,7 @@ fun NormalCalculatorScreen(
                     ) {
                         CalcKeyButton(
                             label = "00",
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+                            containerColor = translucentCardSurfaceColor(lightAlpha = 0.68f, darkAlpha = 0.64f),
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             onClick = viewModel::onDoubleZero,
                             testTag = "calc_key_00",
@@ -329,7 +332,7 @@ fun NormalCalculatorScreen(
                         )
                         CalcKeyButton(
                             label = "0",
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+                            containerColor = translucentCardSurfaceColor(lightAlpha = 0.68f, darkAlpha = 0.64f),
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             onClick = { viewModel.onDigit("0") },
                             testTag = "calc_key_0",
@@ -337,7 +340,7 @@ fun NormalCalculatorScreen(
                         )
                         CalcKeyButton(
                             label = ".",
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+                            containerColor = translucentCardSurfaceColor(lightAlpha = 0.68f, darkAlpha = 0.64f),
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             onClick = viewModel::onDecimal,
                             testTag = "calc_key_dot",
@@ -373,7 +376,7 @@ private fun CalcNumberOperatorRow(
         nums.forEach { d ->
             CalcKeyButton(
                 label = d,
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+                containerColor = translucentCardSurfaceColor(lightAlpha = 0.68f, darkAlpha = 0.64f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 onClick = { onDigit(d) },
                 testTag = "calc_key_$d",
@@ -407,7 +410,7 @@ private fun CalcKeyButton(
             containerColor = containerColor,
             contentColor = contentColor
         ),
-        elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 1.dp),
+        elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 0.dp),
         modifier = modifier
             .height(64.dp)
             .testTag(testTag)

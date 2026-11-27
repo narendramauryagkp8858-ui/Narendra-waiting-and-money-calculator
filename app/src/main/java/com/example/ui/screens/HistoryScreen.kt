@@ -66,6 +66,8 @@ import com.example.ui.components.ConfirmClearHistoryDialog
 import com.example.ui.components.NarendraTopBar
 import com.example.ui.components.ResultDetailRow
 import com.example.ui.theme.WhatsAppGreen
+import com.example.ui.theme.translucentCardBorderColor
+import com.example.ui.theme.translucentCardSurfaceColor
 import kotlinx.coroutines.launch
 
 @Composable
@@ -282,7 +284,19 @@ private fun HistoryItemCard(
     onShareWhatsApp: () -> Unit
 ) {
     val strings = LocalStrings.current
-    val calcType = CalculationType.fromKey(item.calculationType)
+    val calcType = remember(item.calculationType) { CalculationType.fromKey(item.calculationType) }
+    val typeLabel = remember(item.calculationType, strings) {
+        ReceiptFormatter.calculationTypeLabel(item.calculationType, strings)
+    }
+    val formattedTime = remember(item.timestamp) {
+        ReceiptFormatter.formatTimestamp(item.timestamp)
+    }
+    val rateFieldLabel = remember(item.calculationType, strings) {
+        ReceiptFormatter.rateFieldLabel(item.calculationType, strings)
+    }
+    val qtyOrWeightLabel = remember(item.calculationType, strings) {
+        ReceiptFormatter.quantityOrWeightFieldLabel(item.calculationType, strings)
+    }
     val badgeColor = when (calcType) {
         CalculationType.WEIGHT_TO_MONEY -> MaterialTheme.colorScheme.primaryContainer
         CalculationType.MONEY_TO_WEIGHT -> MaterialTheme.colorScheme.secondaryContainer
@@ -304,8 +318,9 @@ private fun HistoryItemCard(
             .fillMaxWidth()
             .testTag("history_card_${item.id}"),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+        colors = CardDefaults.cardColors(containerColor = translucentCardSurfaceColor()),
+        border = BorderStroke(1.dp, translucentCardBorderColor()),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
@@ -323,7 +338,7 @@ private fun HistoryItemCard(
                     color = badgeColor
                 ) {
                     Text(
-                        text = ReceiptFormatter.calculationTypeLabel(item.calculationType, strings),
+                        text = typeLabel,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = badgeTextColor,
@@ -333,7 +348,7 @@ private fun HistoryItemCard(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = ReceiptFormatter.formatTimestamp(item.timestamp),
+                        text = formattedTime,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -363,13 +378,13 @@ private fun HistoryItemCard(
 
             if (item.ratePerKg.isNotBlank()) {
                 ResultDetailRow(
-                    label = ReceiptFormatter.rateFieldLabel(item.calculationType, strings),
+                    label = rateFieldLabel,
                     value = item.ratePerKg
                 )
             }
             if (item.weightDisplay.isNotBlank()) {
                 ResultDetailRow(
-                    label = ReceiptFormatter.quantityOrWeightFieldLabel(item.calculationType, strings),
+                    label = qtyOrWeightLabel,
                     value = item.weightDisplay
                 )
             }

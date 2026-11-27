@@ -4,8 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -45,11 +49,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mainViewModel: MainViewModel = viewModel()
             val prefs by mainViewModel.userPreferences.collectAsStateWithLifecycle()
-            val history by mainViewModel.calculationHistory.collectAsStateWithLifecycle()
+            val historyCount by mainViewModel.historyCount.collectAsStateWithLifecycle()
             val latestCalc by mainViewModel.latestCalculation.collectAsStateWithLifecycle()
             val billItems by mainViewModel.billItems.collectAsStateWithLifecycle()
 
-            val calcFactory = CalculatorViewModelFactory(mainViewModel.calculationRepository)
+            val calcFactory = remember(mainViewModel.calculationRepository) {
+                CalculatorViewModelFactory(mainViewModel.calculationRepository)
+            }
             val strings = stringsFor(prefs.appLanguage)
 
             NarendraCalculatorTheme(themeMode = prefs.themeMode) {
@@ -59,7 +65,11 @@ class MainActivity : ComponentActivity() {
 
                         NavHost(
                             navController = navController,
-                            startDestination = Routes.SPLASH
+                            startDestination = Routes.SPLASH,
+                            enterTransition = { fadeIn(animationSpec = tween(180)) },
+                            exitTransition = { fadeOut(animationSpec = tween(140)) },
+                            popEnterTransition = { fadeIn(animationSpec = tween(160)) },
+                            popExitTransition = { fadeOut(animationSpec = tween(140)) }
                         ) {
                         composable(Routes.SPLASH) {
                             SplashScreen(
@@ -75,7 +85,7 @@ class MainActivity : ComponentActivity() {
                         composable(Routes.DASHBOARD) {
                             DashboardScreen(
                                 shopProfile = prefs.shopProfile,
-                                historyCount = history.size,
+                                historyCount = historyCount,
                                 billCount = billItems.size,
                                 latestCalculation = latestCalc,
                                 currentLanguage = prefs.appLanguage,
@@ -206,6 +216,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable(Routes.HISTORY) {
+                            val history by mainViewModel.calculationHistory.collectAsStateWithLifecycle()
                             HistoryScreen(
                                 historyItems = history,
                                 shopProfile = prefs.shopProfile,

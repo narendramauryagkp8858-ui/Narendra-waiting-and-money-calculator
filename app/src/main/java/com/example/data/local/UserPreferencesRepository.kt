@@ -1,6 +1,8 @@
 package com.example.data.local
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -103,22 +105,26 @@ class UserPreferencesRepository(private val context: Context) {
     suspend fun copyLogoToInternalStorage(uri: Uri): String? = withContext(Dispatchers.IO) {
         try {
             val destFile = File(context.filesDir, "shop_logo_${System.currentTimeMillis()}.jpg")
-            // Remove older logos
-            context.filesDir.listFiles()?.filter {
-                it.name.startsWith("shop_logo_")
-            }?.forEach { it.delete() }
 
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                destFile.outputStream().use { output ->
-                    input.copyTo(output)
+            val wroteCompressed = saveSampledLogo(uri, destFile, maxDimPx = 512)
+            if (!wroteCompressed) {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    destFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
                 }
             }
             if (destFile.exists() && destFile.length() > 0) {
                 context.dataStore.edit { prefs ->
                     prefs[Keys.LOGO_PATH] = destFile.absolutePath
                 }
+                // Remove older logos only after the new logo is safely persisted
+                context.filesDir.listFiles()?.filter {
+                    it.name.startsWith("shop_logo_") && it.name != destFile.name
+                }?.forEach { it.delete() }
                 destFile.absolutePath
             } else {
+                if (destFile.exists()) destFile.delete()
                 null
             }
         } catch (_: Exception) {
@@ -132,6 +138,58 @@ class UserPreferencesRepository(private val context: Context) {
         }?.forEach { it.delete() }
         context.dataStore.edit { prefs ->
             prefs[Keys.LOGO_PATH] = ""
+        }
+    }
+
+    private fun saveSampledLogo(uri: Uri, destFile: File, maxDimPx: Int): Boolean {
+        return try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, bounds)
+            }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return false
+
+            var sampleSize = 1
+            while ((bounds.outWidth / sampleSize) > maxDimPx * 2 || (bounds.outHeight / sampleSize) > maxDimPx * 2) {
+                sampleSize *= 2
+            }
+
+            val decodeOpts = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            val decoded = context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, decodeOpts)
+            } ?: return false
+
+            val scale = minOf(
+                1f,
+                maxDimPx.toFloat() / decoded.width.coerceAtLeast(1),
+                maxDimPx.toFloat() / decoded.height.coerceAtLeast(1)
+            )
+            val finalBitmap = if (scale < 1f) {
+                Bitmap.createScaledBitmap(
+                    decoded,
+                    (decoded.width * scale).toInt().coerceAtLeast(1),
+                    (decoded.height * scale).toInt().coerceAtLeast(1),
+                    true
+                ).also {
+                    if (it !== decoded) decoded.recycle()
+                }
+            } else {
+                decoded
+            }
+
+            try {
+                destFile.outputStream().use { out ->
+                    finalBitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                }
+            } finally {
+                finalBitmap.recycle()
+            }
+            destFile.exists() && destFile.length() > 0
+        } catch (_: Exception) {
+            false
         }
     }
 }

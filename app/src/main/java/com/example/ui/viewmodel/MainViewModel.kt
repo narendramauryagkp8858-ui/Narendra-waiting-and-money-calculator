@@ -46,6 +46,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
+    val historyCount: StateFlow<Int> = calculationRepository.calculationCount
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
     val latestCalculation: StateFlow<CalculationEntity?> = calculationRepository.latestCalculation
         .stateIn(
             scope = viewModelScope,

@@ -1,5 +1,7 @@
 package com.example.ui.theme
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -17,16 +19,22 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.local.ThemeMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 val LocalIsDarkTheme = compositionLocalOf { false }
 
@@ -111,31 +119,70 @@ fun NarendraCalculatorTheme(
 }
 
 @Composable
+fun translucentCardSurfaceColor(
+    lightAlpha: Float = 0.60f,
+    darkAlpha: Float = 0.56f
+): Color {
+    val alpha = if (LocalIsDarkTheme.current) darkAlpha else lightAlpha
+    return MaterialTheme.colorScheme.surface.copy(alpha = alpha)
+}
+
+@Composable
+fun translucentCardBorderColor(): Color {
+    val alpha = if (LocalIsDarkTheme.current) 0.42f else 0.36f
+    return MaterialTheme.colorScheme.outline.copy(alpha = alpha)
+}
+
+@Composable
 fun ThemedWatermarkBackground(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     val isDark = LocalIsDarkTheme.current
-    val watermarkAlpha = if (isDark) 0.14f else 0.10f
+    val watermarkAlpha = if (isDark) 0.28f else 0.24f
+    val context = LocalContext.current
+
+    val watermarkBitmap by produceState<ImageBitmap?>(initialValue = null, key1 = context) {
+        value = withContext(Dispatchers.IO) {
+            try {
+                val res = context.resources
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeResource(res, R.drawable.img_splash_photo, bounds)
+                var sampleSize = 1
+                while ((bounds.outWidth / sampleSize) > 512 || (bounds.outHeight / sampleSize) > 512) {
+                    sampleSize *= 2
+                }
+                val opts = BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize
+                    inPreferredConfig = Bitmap.Config.RGB_565
+                }
+                BitmapFactory.decodeResource(res, R.drawable.img_splash_photo, opts)?.asImageBitmap()
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.img_splash_photo),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth(0.80f)
-                .widthIn(max = 360.dp)
-                .aspectRatio(1f)
-                .clip(CircleShape)
-                .alpha(watermarkAlpha)
-                .testTag("theme_watermark_image")
-        )
+        watermarkBitmap?.let { bmp ->
+            Image(
+                bitmap = bmp,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alpha = watermarkAlpha,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(0.84f)
+                    .widthIn(max = 380.dp)
+                    .aspectRatio(1f)
+                    .clip(CircleShape)
+                    .testTag("theme_watermark_image")
+            )
+        }
         content()
     }
 }

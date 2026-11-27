@@ -62,6 +62,8 @@ import com.example.data.local.ThemeMode
 import com.example.localization.LocalStrings
 import com.example.ui.components.ConfirmClearHistoryDialog
 import com.example.ui.components.NarendraTopBar
+import com.example.ui.theme.translucentCardBorderColor
+import com.example.ui.theme.translucentCardSurfaceColor
 import kotlinx.coroutines.launch
 
 @Composable
@@ -111,8 +113,9 @@ fun SettingsScreen(
                 // Edit Shop Profile
                 Card(
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                    colors = CardDefaults.cardColors(containerColor = translucentCardSurfaceColor()),
+                    border = BorderStroke(1.dp, translucentCardBorderColor()),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     SettingsRowItem(
                         icon = Icons.Filled.Storefront,
@@ -127,8 +130,9 @@ fun SettingsScreen(
                 SectionHeader(strings.appearanceSection)
                 Card(
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                    colors = CardDefaults.cardColors(containerColor = translucentCardSurfaceColor()),
+                    border = BorderStroke(1.dp, translucentCardBorderColor()),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -195,8 +199,9 @@ fun SettingsScreen(
                 SectionHeader(strings.languageSection)
                 Card(
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                    colors = CardDefaults.cardColors(containerColor = translucentCardSurfaceColor()),
+                    border = BorderStroke(1.dp, translucentCardBorderColor()),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -248,25 +253,48 @@ fun SettingsScreen(
                 SectionHeader(strings.dataSection)
                 Card(
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                    colors = CardDefaults.cardColors(containerColor = translucentCardSurfaceColor()),
+                    border = BorderStroke(1.dp, translucentCardBorderColor()),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    SettingsRowItem(
-                        icon = Icons.Filled.DeleteSweep,
-                        iconTint = MaterialTheme.colorScheme.error,
-                        title = strings.clearAllHistory,
-                        subtitle = null,
-                        onClick = { showClearConfirm = true },
-                        testTag = "settings_clear_history"
-                    )
+                    Column {
+                        SettingsRowItem(
+                            icon = Icons.Filled.DeleteSweep,
+                            iconTint = MaterialTheme.colorScheme.error,
+                            title = strings.clearAllHistory,
+                            subtitle = null,
+                            onClick = { showClearConfirm = true },
+                            testTag = "settings_clear_history"
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.30f))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Verified,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = strings.dataUpdateSafeNote,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
 
                 // About & Legal Section
                 SectionHeader(strings.infoSection)
                 Card(
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                    colors = CardDefaults.cardColors(containerColor = translucentCardSurfaceColor()),
+                    border = BorderStroke(1.dp, translucentCardBorderColor()),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column {
                         SettingsRowItem(

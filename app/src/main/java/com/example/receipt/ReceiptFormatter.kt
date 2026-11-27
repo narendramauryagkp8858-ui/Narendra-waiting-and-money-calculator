@@ -13,8 +13,18 @@ import java.util.Date
 import java.util.Locale
 
 object ReceiptFormatter {
+    private val dateFormatterCache = ThreadLocal<Pair<Locale, SimpleDateFormat>>()
+
     fun formatTimestamp(timestamp: Long): String {
-        val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+        val currentLocale = Locale.getDefault()
+        val cached = dateFormatterCache.get()
+        val sdf = if (cached != null && cached.first == currentLocale) {
+            cached.second
+        } else {
+            SimpleDateFormat("dd MMM yyyy, hh:mm a", currentLocale).also {
+                dateFormatterCache.set(currentLocale to it)
+            }
+        }
         return sdf.format(Date(timestamp))
     }
 

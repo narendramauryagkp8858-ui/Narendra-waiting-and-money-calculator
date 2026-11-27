@@ -11,6 +11,9 @@ interface CalculationDao {
     @Query("SELECT * FROM calculation_history ORDER BY timestamp DESC")
     fun getAllCalculations(): Flow<List<CalculationEntity>>
 
+    @Query("SELECT COUNT(*) FROM calculation_history")
+    fun getCalculationCount(): Flow<Int>
+
     @Query("SELECT * FROM calculation_history ORDER BY timestamp DESC LIMIT 1")
     fun getLatestCalculation(): Flow<CalculationEntity?>
 

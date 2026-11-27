@@ -80,6 +80,14 @@ object CalculatorEngine {
     private val HUNDRED = BigDecimal("100")
     private val CALC_SCALE = 10
     private val MC = MathContext(16, RoundingMode.HALF_UP)
+    private val IN_LOCALE = Locale.forLanguageTag("en-IN")
+    private val IN_SYMBOLS = DecimalFormatSymbols(IN_LOCALE)
+    private val AMOUNT_DECIMAL_FMT = ThreadLocal.withInitial {
+        DecimalFormat("#,##0.00", IN_SYMBOLS)
+    }
+    private val AMOUNT_WHOLE_FMT = ThreadLocal.withInitial {
+        DecimalFormat("#,##0", IN_SYMBOLS)
+    }
 
     fun parsePositiveDecimal(raw: String): BigDecimal? {
         val cleaned = raw.trim().replace(",", "")
@@ -354,9 +362,8 @@ object CalculatorEngine {
     fun formatAmount(value: BigDecimal): String {
         val scaled = value.setScale(2, RoundingMode.HALF_UP)
         val hasFraction = scaled.remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) != 0
-        val pattern = if (hasFraction) "#,##0.00" else "#,##0"
-        val df = DecimalFormat(pattern, DecimalFormatSymbols(Locale.forLanguageTag("en-IN")))
-        return "₹${df.format(scaled)}"
+        val df = if (hasFraction) AMOUNT_DECIMAL_FMT.get() else AMOUNT_WHOLE_FMT.get()
+        return "₹${df!!.format(scaled)}"
     }
 
     fun formatPlainNumber(value: BigDecimal, maxDecimals: Int = 3): String {

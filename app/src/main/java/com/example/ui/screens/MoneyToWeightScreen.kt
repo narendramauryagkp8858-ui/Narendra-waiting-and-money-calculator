@@ -68,6 +68,8 @@ import com.example.receipt.ReceiptFormatter
 import com.example.ui.components.NarendraTopBar
 import com.example.ui.components.ResultDetailRow
 import com.example.ui.components.WhatsAppActionButton
+import com.example.ui.theme.translucentCardBorderColor
+import com.example.ui.theme.translucentCardSurfaceColor
 import com.example.ui.viewmodel.MoneyToWeightViewModel
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
@@ -161,8 +163,9 @@ fun MoneyToWeightScreen(
             ) {
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                    colors = CardDefaults.cardColors(containerColor = translucentCardSurfaceColor()),
+                    border = BorderStroke(1.dp, translucentCardBorderColor()),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier

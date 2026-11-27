@@ -66,6 +66,8 @@ import com.example.ui.components.NarendraTopBar
 import com.example.ui.components.ResultDetailRow
 import com.example.ui.components.ShopLogoAvatar
 import com.example.ui.components.WhatsAppActionButton
+import com.example.ui.theme.translucentCardBorderColor
+import com.example.ui.theme.translucentCardSurfaceColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -167,10 +169,10 @@ fun ReceiptScreen(
                         Card(
                             shape = RoundedCornerShape(20.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)
+                                containerColor = translucentCardSurfaceColor(lightAlpha = 0.76f, darkAlpha = 0.72f)
                             ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, translucentCardBorderColor()),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("receipt_preview_card")

@@ -158,7 +158,8 @@ data class AppStrings(
     val rateLabel: String,
     val weightOrQtyLabel: String,
     val entryDeletedMsg: String,
-    val undo: String
+    val undo: String,
+    val dataUpdateSafeNote: String
 )
 
 val EnglishStrings = AppStrings(
@@ -306,7 +307,8 @@ val EnglishStrings = AppStrings(
     rateLabel = "Rate",
     weightOrQtyLabel = "Weight / Qty",
     entryDeletedMsg = "Calculation deleted from history",
-    undo = "Undo"
+    undo = "Undo",
+    dataUpdateSafeNote = "Update-Safe Storage: History, shop profile & logo stay safe when updating the app."
 )
 
 val HindiStrings = AppStrings(
@@ -454,7 +456,8 @@ val HindiStrings = AppStrings(
     rateLabel = "भाव",
     weightOrQtyLabel = "वज़न / पीस",
     entryDeletedMsg = "हिसाब इतिहास से हटा दिया गया",
-    undo = "वापस लाएं"
+    undo = "वापस लाएं",
+    dataUpdateSafeNote = "अपडेट-सुरक्षित डेटा: ऐप का नया अपडेट इंस्टॉल करने पर भी आपका सारा हिसाब, दुकान प्रोफ़ाइल और लोगो सुरक्षित रहेगा।"
 )
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {

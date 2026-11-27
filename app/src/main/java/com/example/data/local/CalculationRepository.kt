@@ -10,6 +10,7 @@ class CalculationRepository(private val dao: CalculationDao) {
     private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val allCalculations: Flow<List<CalculationEntity>> = dao.getAllCalculations()
+    val calculationCount: Flow<Int> = dao.getCalculationCount()
     val latestCalculation: Flow<CalculationEntity?> = dao.getLatestCalculation()
 
     suspend fun insert(calculation: CalculationEntity): Long = dao.insert(calculation)

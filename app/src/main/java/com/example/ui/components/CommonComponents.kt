@@ -33,17 +33,20 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.localization.LocalStrings
 import com.example.ui.theme.WhatsAppGreen
 import java.io.File
@@ -80,7 +83,7 @@ fun NarendraTopBar(
         },
         actions = { actions() },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.86f),
+            containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.70f),
             titleContentColor = MaterialTheme.colorScheme.onBackground
         )
     )
@@ -93,8 +96,19 @@ fun ShopLogoAvatar(
     size: Dp = 52.dp,
     modifier: Modifier = Modifier
 ) {
-    val file = if (logoPath.isNotBlank()) File(logoPath) else null
-    val hasValidFile = file != null && file.exists()
+    val context = LocalContext.current
+    val validFile = remember(logoPath) {
+        if (logoPath.isNotBlank()) File(logoPath).takeIf { it.exists() } else null
+    }
+    val imageRequest = remember(validFile, context) {
+        validFile?.let {
+            ImageRequest.Builder(context)
+                .data(it)
+                .size(192)
+                .crossfade(false)
+                .build()
+        }
+    }
 
     Surface(
         modifier = modifier.size(size),
@@ -102,9 +116,9 @@ fun ShopLogoAvatar(
         color = MaterialTheme.colorScheme.primaryContainer,
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
     ) {
-        if (hasValidFile) {
+        if (imageRequest != null) {
             AsyncImage(
-                model = file,
+                model = imageRequest,
                 contentDescription = "$shopName logo",
                 modifier = Modifier
                     .fillMaxSize()

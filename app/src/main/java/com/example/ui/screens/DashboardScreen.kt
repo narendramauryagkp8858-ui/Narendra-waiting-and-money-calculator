@@ -3,7 +3,6 @@ package com.example.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddShoppingCart
@@ -49,7 +47,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -76,6 +73,18 @@ import com.example.data.local.ThemeMode
 import com.example.localization.LocalStrings
 import com.example.ui.components.ShopLogoAvatar
 import com.example.ui.theme.WhatsAppGreen
+import com.example.ui.theme.translucentCardBorderColor
+import com.example.ui.theme.translucentCardSurfaceColor
+
+private data class DashboardMenuOption(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val accentColor: Color,
+    val badgeText: String? = null,
+    val testTag: String,
+    val onClick: () -> Unit
+)
 
 @Composable
 fun DashboardScreen(
@@ -100,6 +109,96 @@ fun DashboardScreen(
     val strings = LocalStrings.current
     var showNoReceiptDialog by remember { mutableStateOf(false) }
 
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val neutralTint = MaterialTheme.colorScheme.onSurfaceVariant
+
+    val menuOptions = remember(strings, billCount, historyCount, latestCalculation, primaryColor, secondaryColor, tertiaryColor, neutralTint) {
+        listOf(
+            DashboardMenuOption(
+                title = strings.weightToMoneyTitle,
+                subtitle = strings.weightToMoneyDesc,
+                icon = Icons.Filled.Scale,
+                accentColor = primaryColor,
+                testTag = "menu_weight_to_money",
+                onClick = onNavigateWeightToMoney
+            ),
+            DashboardMenuOption(
+                title = strings.moneyToWeightTitle,
+                subtitle = strings.moneyToWeightDesc,
+                icon = Icons.Filled.CurrencyRupee,
+                accentColor = secondaryColor,
+                testTag = "menu_money_to_weight",
+                onClick = onNavigateMoneyToWeight
+            ),
+            DashboardMenuOption(
+                title = strings.pieceToMoneyTitle,
+                subtitle = strings.pieceToMoneyDesc,
+                icon = Icons.Filled.Inventory2,
+                accentColor = primaryColor,
+                testTag = "menu_piece_to_money",
+                onClick = onNavigatePieceToMoney
+            ),
+            DashboardMenuOption(
+                title = strings.combinedBillTitle,
+                subtitle = strings.combinedBillDesc,
+                icon = Icons.Filled.AddShoppingCart,
+                accentColor = tertiaryColor,
+                badgeText = if (billCount > 0) billCount.toString() else null,
+                testTag = "menu_combined_bill",
+                onClick = onNavigateCombinedBill
+            ),
+            DashboardMenuOption(
+                title = strings.normalCalculatorTitle,
+                subtitle = strings.normalCalculatorDesc,
+                icon = Icons.Filled.Calculate,
+                accentColor = tertiaryColor,
+                testTag = "menu_normal_calculator",
+                onClick = onNavigateNormalCalculator
+            ),
+            DashboardMenuOption(
+                title = strings.historyTitle,
+                subtitle = strings.historyDesc,
+                icon = Icons.Filled.History,
+                accentColor = primaryColor,
+                badgeText = if (historyCount > 0) historyCount.toString() else null,
+                testTag = "menu_history",
+                onClick = onNavigateHistory
+            ),
+            DashboardMenuOption(
+                title = strings.shopProfileTitle,
+                subtitle = strings.shopProfileDesc,
+                icon = Icons.Filled.Storefront,
+                accentColor = secondaryColor,
+                testTag = "menu_shop_profile",
+                onClick = onNavigateShopProfile
+            ),
+            DashboardMenuOption(
+                title = strings.whatsappShareTitle,
+                subtitle = strings.whatsappShareDesc,
+                icon = Icons.Filled.Share,
+                accentColor = WhatsAppGreen,
+                testTag = "menu_whatsapp_share",
+                onClick = {
+                    if (latestCalculation != null) {
+                        onOpenReceipt(latestCalculation.id)
+                    } else {
+                        showNoReceiptDialog = true
+                    }
+                }
+            ),
+            DashboardMenuOption(
+                title = strings.settingsTitle,
+                subtitle = strings.settingsDesc,
+                icon = Icons.Filled.Settings,
+                accentColor = neutralTint,
+                testTag = "menu_settings",
+                onClick = onNavigateSettings
+            )
+        )
+    }
+
     Scaffold(
         containerColor = Color.Transparent
     ) { innerPadding ->
@@ -112,9 +211,10 @@ fun DashboardScreen(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .widthIn(max = 720.dp)
+                    .widthIn(max = 760.dp)
             ) {
-                val isWide = maxWidth >= 560.dp
+                val columns = if (maxWidth >= 560.dp) 3 else 2
+                val rows = remember(menuOptions, columns) { menuOptions.chunked(columns) }
 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -124,7 +224,7 @@ fun DashboardScreen(
                         top = 12.dp,
                         bottom = 28.dp
                     ),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Header Brand Bar
                     item {
@@ -156,7 +256,7 @@ fun DashboardScreen(
                                 Surface(
                                     onClick = onToggleLanguage,
                                     shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f),
                                     modifier = Modifier
                                         .minimumInteractiveComponentSize()
                                         .testTag("dashboard_language_toggle")
@@ -200,7 +300,7 @@ fun DashboardScreen(
                         }
                     }
 
-                    // Shop Hero Banner Card
+                    // Shop Hero Banner Card (translucent merchant card)
                     item {
                         Card(
                             onClick = onNavigateShopProfile,
@@ -209,18 +309,18 @@ fun DashboardScreen(
                                 .testTag("dashboard_shop_banner"),
                             shape = RoundedCornerShape(22.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                                containerColor = Color.Transparent
                             ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                         ) {
                             Box(modifier = Modifier.fillMaxWidth()) {
                                 Image(
                                     painter = painterResource(id = R.drawable.img_merchant_banner),
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
-                                    alpha = 0.16f,
-                                    modifier = Modifier
-                                        .matchParentSize()
+                                    alpha = 0.14f,
+                                    modifier = Modifier.matchParentSize()
                                 )
                                 Box(
                                     modifier = Modifier
@@ -228,8 +328,8 @@ fun DashboardScreen(
                                         .background(
                                             Brush.horizontalGradient(
                                                 colors = listOf(
-                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
-                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)
+                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.78f),
+                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.64f)
                                                 )
                                             )
                                         )
@@ -237,13 +337,13 @@ fun DashboardScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(18.dp),
+                                        .padding(16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     ShopLogoAvatar(
                                         logoPath = shopProfile.logoPath,
                                         shopName = shopProfile.effectiveShopName,
-                                        size = 56.dp
+                                        size = 52.dp
                                     )
                                     Spacer(modifier = Modifier.width(14.dp))
                                     Column(modifier = Modifier.weight(1f)) {
@@ -259,7 +359,7 @@ fun DashboardScreen(
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
-                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = if (shopProfile.hasCustomName) {
                                                 listOfNotNull(
@@ -270,7 +370,7 @@ fun DashboardScreen(
                                                 strings.tapToEditShop
                                             },
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = Color.White.copy(alpha = 0.88f),
+                                            color = Color.White.copy(alpha = 0.90f),
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -285,228 +385,26 @@ fun DashboardScreen(
                         }
                     }
 
-                    // Primary 2 Calculators (Highlighted Row)
-                    item {
-                        if (isWide) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                PrimaryFeatureCard(
-                                    title = strings.weightToMoneyTitle,
-                                    subtitle = strings.weightToMoneyDesc,
-                                    icon = Icons.Filled.Scale,
-                                    accentColor = MaterialTheme.colorScheme.primary,
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                    onClick = onNavigateWeightToMoney,
-                                    testTag = "menu_weight_to_money",
-                                    modifier = Modifier.weight(1f)
-                                )
-                                PrimaryFeatureCard(
-                                    title = strings.moneyToWeightTitle,
-                                    subtitle = strings.moneyToWeightDesc,
-                                    icon = Icons.Filled.CurrencyRupee,
-                                    accentColor = MaterialTheme.colorScheme.secondary,
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                    onClick = onNavigateMoneyToWeight,
-                                    testTag = "menu_money_to_weight",
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                PrimaryFeatureCard(
-                                    title = strings.weightToMoneyTitle,
-                                    subtitle = strings.weightToMoneyDesc,
-                                    icon = Icons.Filled.Scale,
-                                    accentColor = MaterialTheme.colorScheme.primary,
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                    onClick = onNavigateWeightToMoney,
-                                    testTag = "menu_weight_to_money",
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                PrimaryFeatureCard(
-                                    title = strings.moneyToWeightTitle,
-                                    subtitle = strings.moneyToWeightDesc,
-                                    icon = Icons.Filled.CurrencyRupee,
-                                    accentColor = MaterialTheme.colorScheme.secondary,
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                    onClick = onNavigateMoneyToWeight,
-                                    testTag = "menu_money_to_weight",
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    }
+                    // Uniform Translucent Grid of All App Options
+                    items(
+                        count = rows.size,
+                        key = { index -> rows[index].first().testTag },
+                        contentType = { "grid_row" }
+                    ) { rowIndex ->
+                        val rowItems = rows[rowIndex]
+                        val isLastRow = rowIndex == rows.lastIndex
 
-                    // Piece & Rate + Combined Bill (Weight & Piece)
-                    item {
-                        if (isWide) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                PrimaryFeatureCard(
-                                    title = strings.pieceToMoneyTitle,
-                                    subtitle = strings.pieceToMoneyDesc,
-                                    icon = Icons.Filled.Inventory2,
-                                    accentColor = MaterialTheme.colorScheme.primary,
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                    onClick = onNavigatePieceToMoney,
-                                    testTag = "menu_piece_to_money",
-                                    modifier = Modifier.weight(1f)
-                                )
-                                PrimaryFeatureCard(
-                                    title = if (billCount > 0) "${strings.combinedBillTitle} ($billCount)" else strings.combinedBillTitle,
-                                    subtitle = strings.combinedBillDesc,
-                                    icon = Icons.Filled.AddShoppingCart,
-                                    accentColor = MaterialTheme.colorScheme.tertiary,
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                    onClick = onNavigateCombinedBill,
-                                    testTag = "menu_combined_bill",
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                PrimaryFeatureCard(
-                                    title = strings.pieceToMoneyTitle,
-                                    subtitle = strings.pieceToMoneyDesc,
-                                    icon = Icons.Filled.Inventory2,
-                                    accentColor = MaterialTheme.colorScheme.primary,
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                    onClick = onNavigatePieceToMoney,
-                                    testTag = "menu_piece_to_money",
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                PrimaryFeatureCard(
-                                    title = if (billCount > 0) "${strings.combinedBillTitle} ($billCount)" else strings.combinedBillTitle,
-                                    subtitle = strings.combinedBillDesc,
-                                    icon = Icons.Filled.AddShoppingCart,
-                                    accentColor = MaterialTheme.colorScheme.tertiary,
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                    onClick = onNavigateCombinedBill,
-                                    testTag = "menu_combined_bill",
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    }
-
-                    // Secondary Grid: Normal Calculator & History
-                    item {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            CompactGridCard(
-                                title = strings.normalCalculatorTitle,
-                                subtitle = strings.normalCalculatorDesc,
-                                icon = Icons.Filled.Calculate,
-                                iconTint = MaterialTheme.colorScheme.tertiary,
-                                badgeText = null,
-                                onClick = onNavigateNormalCalculator,
-                                testTag = "menu_normal_calculator",
-                                modifier = Modifier.weight(1f)
-                            )
-                            CompactGridCard(
-                                title = strings.historyTitle,
-                                subtitle = strings.historyDesc,
-                                icon = Icons.Filled.History,
-                                iconTint = MaterialTheme.colorScheme.primary,
-                                badgeText = if (historyCount > 0) historyCount.toString() else null,
-                                onClick = onNavigateHistory,
-                                testTag = "menu_history",
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    // Shop Profile & WhatsApp Share
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            CompactGridCard(
-                                title = strings.shopProfileTitle,
-                                subtitle = strings.shopProfileDesc,
-                                icon = Icons.Filled.Storefront,
-                                iconTint = MaterialTheme.colorScheme.secondary,
-                                badgeText = null,
-                                onClick = onNavigateShopProfile,
-                                testTag = "menu_shop_profile",
-                                modifier = Modifier.weight(1f)
-                            )
-                            CompactGridCard(
-                                title = strings.whatsappShareTitle,
-                                subtitle = strings.whatsappShareDesc,
-                                icon = Icons.Filled.Share,
-                                iconTint = WhatsAppGreen,
-                                badgeText = null,
-                                onClick = {
-                                    if (latestCalculation != null) {
-                                        onOpenReceipt(latestCalculation.id)
-                                    } else {
-                                        showNoReceiptDialog = true
-                                    }
-                                },
-                                testTag = "menu_whatsapp_share",
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    // Settings Full-Width Card
-                    item {
-                        Card(
-                            onClick = onNavigateSettings,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .testTag("menu_settings"),
-                            shape = RoundedCornerShape(18.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
-                            ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                                .then(if (isLastRow) Modifier.navigationBarsPadding() else Modifier),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Settings,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(14.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = strings.settingsTitle,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = strings.settingsDesc,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Icon(
-                                    imageVector = Icons.Filled.ChevronRight,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            rowItems.forEach { option ->
+                                DashboardGridTile(
+                                    option = option,
+                                    isWideSingleTile = columns == 2 && rowItems.size == 1,
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
                         }
@@ -546,144 +444,130 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun PrimaryFeatureCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    accentColor: Color,
-    containerColor: Color,
-    onClick: () -> Unit,
-    testTag: String,
+private fun DashboardGridTile(
+    option: DashboardMenuOption,
+    isWideSingleTile: Boolean,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.testTag(testTag),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        border = BorderStroke(1.2.dp, accentColor.copy(alpha = 0.35f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(15.dp))
-                    .background(accentColor.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Icon(
-                imageVector = Icons.Filled.ChevronRight,
-                contentDescription = null,
-                tint = accentColor
-            )
-        }
+    val cardBg = translucentCardSurfaceColor(lightAlpha = 0.56f, darkAlpha = 0.52f)
+    val borderColor = if (option.testTag == "menu_settings") {
+        translucentCardBorderColor()
+    } else {
+        option.accentColor.copy(alpha = 0.34f)
     }
-}
 
-@Composable
-private fun CompactGridCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    iconTint: Color,
-    badgeText: String?,
-    onClick: () -> Unit,
-    testTag: String,
-    modifier: Modifier = Modifier
-) {
     Card(
-        onClick = onClick,
+        onClick = option.onClick,
         modifier = modifier
-            .height(146.dp)
-            .testTag(testTag),
+            .height(if (isWideSingleTile) 86.dp else 142.dp)
+            .testTag(option.testTag),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = BorderStroke(1.dp, borderColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(15.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
+        if (isWideSingleTile) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(13.dp))
-                        .background(iconTint.copy(alpha = 0.13f)),
+                        .background(option.accentColor.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = icon,
+                        imageVector = option.icon,
                         contentDescription = null,
-                        tint = iconTint,
+                        tint = option.accentColor,
                         modifier = Modifier.size(24.dp)
                     )
                 }
-                if (badgeText != null) {
-                    Badge(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = option.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = option.subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = option.accentColor
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(13.dp))
+                            .background(option.accentColor.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = badgeText,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        Icon(
+                            imageVector = option.icon,
+                            contentDescription = null,
+                            tint = option.accentColor,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
+                    if (option.badgeText != null) {
+                        Badge(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ) {
+                            Text(
+                                text = option.badgeText,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
                 }
-            }
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column {
+                    Text(
+                        text = option.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = option.subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }

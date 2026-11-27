@@ -62,6 +62,8 @@ import com.example.data.local.ShopProfile
 import com.example.localization.LocalStrings
 import com.example.ui.components.NarendraTopBar
 import com.example.ui.components.ShopLogoAvatar
+import com.example.ui.theme.translucentCardBorderColor
+import com.example.ui.theme.translucentCardSurfaceColor
 import kotlinx.coroutines.launch
 
 @Composable
@@ -125,8 +127,9 @@ fun ShopProfileScreen(
                 // Logo Picker Card
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                    colors = CardDefaults.cardColors(containerColor = translucentCardSurfaceColor()),
+                    border = BorderStroke(1.dp, translucentCardBorderColor()),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -194,8 +197,9 @@ fun ShopProfileScreen(
                 // Form Fields Card
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                    colors = CardDefaults.cardColors(containerColor = translucentCardSurfaceColor()),
+                    border = BorderStroke(1.dp, translucentCardBorderColor()),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier
