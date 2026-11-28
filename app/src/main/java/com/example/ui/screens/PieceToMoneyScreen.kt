@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -163,17 +162,19 @@ fun PieceToMoneyScreen(
                     .navigationBarsPadding(),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                AnimatedVisibility(visible = billItems.isNotEmpty()) {
-                    val totals = CalculatorEngine.calculateCombinedBillTotals(billItems)
-                    val summaryParts = buildList {
-                        if (totals.weightItemCount > 0) {
-                            add(CalculatorEngine.formatGramsHuman(totals.totalWeightInGrams, strings.kgUnit, strings.gramUnit))
-                        }
-                        if (totals.pieceItemCount > 0) {
-                            add("${CalculatorEngine.formatPlainNumber(totals.totalPieces, 3)} ${strings.piecesPlural}")
-                        }
-                        add(CalculatorEngine.formatAmount(totals.totalAmount))
-                    }.joinToString(" • ")
+                if (billItems.isNotEmpty()) {
+                    val summaryParts = remember(billItems, strings) {
+                        val totals = CalculatorEngine.calculateCombinedBillTotals(billItems)
+                        buildList {
+                            if (totals.weightItemCount > 0) {
+                                add(CalculatorEngine.formatGramsHuman(totals.totalWeightInGrams, strings.kgUnit, strings.gramUnit))
+                            }
+                            if (totals.pieceItemCount > 0) {
+                                add("${CalculatorEngine.formatPlainNumber(totals.totalPieces, 3)} ${strings.piecesPlural}")
+                            }
+                            add(CalculatorEngine.formatAmount(totals.totalAmount))
+                        }.joinToString(" • ")
+                    }
 
                     Card(
                         onClick = onOpenCombinedBill,
@@ -282,11 +283,12 @@ fun PieceToMoneyScreen(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        val quickQuantities = remember { listOf("1", "2", "5", "10", "12", "24") }
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            listOf("1", "2", "5", "10", "12", "24").forEach { qty ->
+                            quickQuantities.forEach { qty ->
                                 AssistChip(
                                     onClick = { viewModel.applyQuickQuantity(qty) },
                                     label = { Text("$qty ${strings.pieceUnit}") }
@@ -330,8 +332,7 @@ fun PieceToMoneyScreen(
                 }
 
                 // Live Result Card
-                AnimatedVisibility(visible = state.liveResult != null) {
-                    state.liveResult?.let { result ->
+                state.liveResult?.let { result ->
                         val qtyText = "${CalculatorEngine.formatPlainNumber(result.quantity, 3)} ${strings.pieceUnit}"
                         val rateText = "${CalculatorEngine.formatAmount(result.pricePerPiece)} / ${strings.pieceUnit}"
                         val totalText = CalculatorEngine.formatAmount(result.totalAmount)
@@ -495,7 +496,6 @@ fun PieceToMoneyScreen(
                             }
                         }
                     }
-                }
             }
         }
     }

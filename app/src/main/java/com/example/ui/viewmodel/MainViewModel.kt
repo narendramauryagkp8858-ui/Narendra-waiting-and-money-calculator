@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -37,6 +39,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = UserPreferences()
+        )
+
+    val themeMode: StateFlow<ThemeMode> = userPreferences
+        .map { it.themeMode }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ThemeMode.SYSTEM
+        )
+
+    val appLanguage: StateFlow<AppLanguage> = userPreferences
+        .map { it.appLanguage }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = AppLanguage.ENGLISH
+        )
+
+    val shopProfile: StateFlow<ShopProfile> = userPreferences
+        .map { it.shopProfile }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ShopProfile()
         )
 
     val calculationHistory: StateFlow<List<CalculationEntity>> = calculationRepository.allCalculations
@@ -257,10 +286,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun toggleTheme() {
+        val next = if (themeMode.value == ThemeMode.DARK) {
+            ThemeMode.LIGHT
+        } else {
+            ThemeMode.DARK
+        }
+        setThemeMode(next)
+    }
+
     fun setLanguage(language: AppLanguage) {
         viewModelScope.launch {
             preferencesRepository.saveLanguage(language)
         }
+    }
+
+    fun toggleLanguage() {
+        val next = if (appLanguage.value == AppLanguage.ENGLISH) {
+            AppLanguage.HINDI
+        } else {
+            AppLanguage.ENGLISH
+        }
+        setLanguage(next)
     }
 
     fun deleteHistoryItem(id: Long) {

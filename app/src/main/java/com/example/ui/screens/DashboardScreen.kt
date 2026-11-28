@@ -1,13 +1,11 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,8 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Calculate
@@ -59,13 +58,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.R
 import com.example.data.local.AppLanguage
 import com.example.data.local.CalculationEntity
 import com.example.data.local.ShopProfile
@@ -114,7 +110,17 @@ fun DashboardScreen(
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
     val neutralTint = MaterialTheme.colorScheme.onSurfaceVariant
 
-    val menuOptions = remember(strings, billCount, historyCount, latestCalculation, primaryColor, secondaryColor, tertiaryColor, neutralTint) {
+    val latestCalcId = latestCalculation?.id
+    val menuOptions = remember(
+        strings,
+        billCount,
+        historyCount,
+        latestCalcId,
+        primaryColor,
+        secondaryColor,
+        tertiaryColor,
+        neutralTint
+    ) {
         listOf(
             DashboardMenuOption(
                 title = strings.weightToMoneyTitle,
@@ -181,8 +187,8 @@ fun DashboardScreen(
                 accentColor = WhatsAppGreen,
                 testTag = "menu_whatsapp_share",
                 onClick = {
-                    if (latestCalculation != null) {
-                        onOpenReceipt(latestCalculation.id)
+                    if (latestCalcId != null) {
+                        onOpenReceipt(latestCalcId)
                     } else {
                         showNoReceiptDialog = true
                     }
@@ -215,189 +221,172 @@ fun DashboardScreen(
             ) {
                 val columns = if (maxWidth >= 560.dp) 3 else 2
                 val rows = remember(menuOptions, columns) { menuOptions.chunked(columns) }
+                val scrollState = rememberScrollState()
 
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 12.dp,
-                        bottom = 28.dp
-                    ),
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 12.dp,
+                            bottom = 28.dp
+                        )
+                        .navigationBarsPadding(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Header Brand Bar
-                    item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Narendra Weight & Money Calculator",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = strings.developerTagline,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Narendra Weight & Money Calculator",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = strings.developerTagline,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            Surface(
+                                onClick = onToggleLanguage,
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f),
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .testTag("dashboard_language_toggle")
                             ) {
-                                Surface(
-                                    onClick = onToggleLanguage,
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f),
-                                    modifier = Modifier
-                                        .minimumInteractiveComponentSize()
-                                        .testTag("dashboard_language_toggle")
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Translate,
-                                            contentDescription = strings.languageLabel,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            text = if (currentLanguage == AppLanguage.ENGLISH) "हिं" else "EN",
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                IconButton(
-                                    onClick = onToggleTheme,
-                                    modifier = Modifier
-                                        .minimumInteractiveComponentSize()
-                                        .testTag("dashboard_theme_toggle")
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(
-                                        imageVector = if (currentThemeMode == ThemeMode.DARK) {
-                                            Icons.Filled.LightMode
-                                        } else {
-                                            Icons.Filled.DarkMode
-                                        },
-                                        contentDescription = strings.appThemeLabel,
-                                        tint = MaterialTheme.colorScheme.onBackground
+                                        imageVector = Icons.Filled.Translate,
+                                        contentDescription = strings.languageLabel,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = if (currentLanguage == AppLanguage.ENGLISH) "हिं" else "EN",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
+                            }
+
+                            IconButton(
+                                onClick = onToggleTheme,
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .testTag("dashboard_theme_toggle")
+                            ) {
+                                Icon(
+                                    imageVector = if (currentThemeMode == ThemeMode.DARK) {
+                                        Icons.Filled.LightMode
+                                    } else {
+                                        Icons.Filled.DarkMode
+                                    },
+                                    contentDescription = strings.appThemeLabel,
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
                             }
                         }
                     }
 
                     // Shop Hero Banner Card (translucent merchant card)
-                    item {
-                        Card(
-                            onClick = onNavigateShopProfile,
+                    Card(
+                        onClick = onNavigateShopProfile,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("dashboard_shop_banner"),
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color.Transparent
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .testTag("dashboard_shop_banner"),
-                            shape = RoundedCornerShape(22.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color.Transparent
-                            ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                        ) {
-                            Box(modifier = Modifier.fillMaxWidth()) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.img_merchant_banner),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    alpha = 0.14f,
-                                    modifier = Modifier.matchParentSize()
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .matchParentSize()
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                colors = listOf(
-                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.78f),
-                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.64f)
-                                                )
-                                            )
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.84f),
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.68f)
                                         )
-                                )
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    ShopLogoAvatar(
-                                        logoPath = shopProfile.logoPath,
-                                        shopName = shopProfile.effectiveShopName,
-                                        size = 52.dp
                                     )
-                                    Spacer(modifier = Modifier.width(14.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = if (shopProfile.hasCustomName) {
-                                                shopProfile.shopName
-                                            } else {
-                                                strings.setupShopPrompt
-                                            },
-                                            style = MaterialTheme.typography.titleLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = if (shopProfile.hasCustomName) {
-                                                listOfNotNull(
-                                                    shopProfile.ownerName.takeIf { it.isNotBlank() },
-                                                    shopProfile.mobileNumber.takeIf { it.isNotBlank() }
-                                                ).joinToString(" • ").ifBlank { strings.tapToEditShop }
-                                            } else {
-                                                strings.tapToEditShop
-                                            },
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = Color.White.copy(alpha = 0.90f),
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    Icon(
-                                        imageVector = Icons.Filled.ChevronRight,
-                                        contentDescription = null,
-                                        tint = Color.White
+                                )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                ShopLogoAvatar(
+                                    logoPath = shopProfile.logoPath,
+                                    shopName = shopProfile.effectiveShopName,
+                                    size = 52.dp
+                                )
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (shopProfile.hasCustomName) {
+                                            shopProfile.shopName
+                                        } else {
+                                            strings.setupShopPrompt
+                                        },
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (shopProfile.hasCustomName) {
+                                            listOfNotNull(
+                                                shopProfile.ownerName.takeIf { it.isNotBlank() },
+                                                shopProfile.mobileNumber.takeIf { it.isNotBlank() }
+                                            ).joinToString(" • ").ifBlank { strings.tapToEditShop }
+                                        } else {
+                                            strings.tapToEditShop
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White.copy(alpha = 0.90f),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
+                                Icon(
+                                    imageVector = Icons.Filled.ChevronRight,
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
                             }
                         }
                     }
 
                     // Uniform Translucent Grid of All App Options
-                    items(
-                        count = rows.size,
-                        key = { index -> rows[index].first().testTag },
-                        contentType = { "grid_row" }
-                    ) { rowIndex ->
-                        val rowItems = rows[rowIndex]
-                        val isLastRow = rowIndex == rows.lastIndex
-
+                    rows.forEach { rowItems ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(if (isLastRow) Modifier.navigationBarsPadding() else Modifier),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             rowItems.forEach { option ->

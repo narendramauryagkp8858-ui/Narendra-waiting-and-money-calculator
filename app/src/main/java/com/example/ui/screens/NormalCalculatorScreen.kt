@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -66,9 +66,13 @@ fun NormalCalculatorScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val displayScrollState = rememberScrollState()
+    val numberKeyBg = translucentCardSurfaceColor(lightAlpha = 0.68f, darkAlpha = 0.64f)
+    val row789 = remember { listOf("7", "8", "9") }
+    val row456 = remember { listOf("4", "5", "6") }
+    val row123 = remember { listOf("1", "2", "3") }
 
     LaunchedEffect(state.primaryDisplay) {
-        displayScrollState.animateScrollTo(displayScrollState.maxValue)
+        displayScrollState.scrollTo(displayScrollState.maxValue)
     }
 
     DisposableEffect(Unit) {
@@ -121,7 +125,7 @@ fun NormalCalculatorScreen(
                         horizontalAlignment = Alignment.End
                     ) {
                         // Past evaluated expression header after pressing =
-                        AnimatedVisibility(visible = state.evaluatedHeader.isNotEmpty()) {
+                        if (state.evaluatedHeader.isNotEmpty()) {
                             Text(
                                 text = state.evaluatedHeader,
                                 style = MaterialTheme.typography.titleMedium.copy(
@@ -170,7 +174,7 @@ fun NormalCalculatorScreen(
                         )
 
                         // Subtle Live Preview Result WITHOUT pressing '='
-                        AnimatedVisibility(visible = state.livePreview.isNotEmpty() && !state.justEvaluated && !state.isError) {
+                        if (state.livePreview.isNotEmpty() && !state.justEvaluated && !state.isError) {
                             Text(
                                 text = "= ${state.livePreview}",
                                 style = MaterialTheme.typography.headlineMedium.copy(
@@ -295,25 +299,28 @@ fun NormalCalculatorScreen(
                     }
 
                     CalcNumberOperatorRow(
-                        nums = listOf("7", "8", "9"),
+                        nums = row789,
                         op = "×",
                         opTestTag = "calc_key_multiply",
+                        numberKeyBg = numberKeyBg,
                         onDigit = viewModel::onDigit,
                         onOperator = viewModel::onOperator
                     )
 
                     CalcNumberOperatorRow(
-                        nums = listOf("4", "5", "6"),
+                        nums = row456,
                         op = "-",
                         opTestTag = "calc_key_minus",
+                        numberKeyBg = numberKeyBg,
                         onDigit = viewModel::onDigit,
                         onOperator = viewModel::onOperator
                     )
 
                     CalcNumberOperatorRow(
-                        nums = listOf("1", "2", "3"),
+                        nums = row123,
                         op = "+",
                         opTestTag = "calc_key_plus",
+                        numberKeyBg = numberKeyBg,
                         onDigit = viewModel::onDigit,
                         onOperator = viewModel::onOperator
                     )
@@ -324,7 +331,7 @@ fun NormalCalculatorScreen(
                     ) {
                         CalcKeyButton(
                             label = "00",
-                            containerColor = translucentCardSurfaceColor(lightAlpha = 0.68f, darkAlpha = 0.64f),
+                            containerColor = numberKeyBg,
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             onClick = viewModel::onDoubleZero,
                             testTag = "calc_key_00",
@@ -332,15 +339,15 @@ fun NormalCalculatorScreen(
                         )
                         CalcKeyButton(
                             label = "0",
-                            containerColor = translucentCardSurfaceColor(lightAlpha = 0.68f, darkAlpha = 0.64f),
+                            containerColor = numberKeyBg,
                             contentColor = MaterialTheme.colorScheme.onSurface,
-                            onClick = { viewModel.onDigit("0") },
+                            onClick = remember(viewModel) { { viewModel.onDigit("0") } },
                             testTag = "calc_key_0",
                             modifier = Modifier.weight(1f)
                         )
                         CalcKeyButton(
                             label = ".",
-                            containerColor = translucentCardSurfaceColor(lightAlpha = 0.68f, darkAlpha = 0.64f),
+                            containerColor = numberKeyBg,
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             onClick = viewModel::onDecimal,
                             testTag = "calc_key_dot",
@@ -350,7 +357,7 @@ fun NormalCalculatorScreen(
                             label = "=",
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary,
-                            onClick = { viewModel.onEquals() },
+                            onClick = remember(viewModel) { { viewModel.onEquals() } },
                             testTag = "calc_key_equals",
                             modifier = Modifier.weight(1f)
                         )
@@ -366,6 +373,7 @@ private fun CalcNumberOperatorRow(
     nums: List<String>,
     op: String,
     opTestTag: String,
+    numberKeyBg: Color,
     onDigit: (String) -> Unit,
     onOperator: (String) -> Unit
 ) {
@@ -374,20 +382,22 @@ private fun CalcNumberOperatorRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         nums.forEach { d ->
+            val onDigitClick = remember(d, onDigit) { { onDigit(d) } }
             CalcKeyButton(
                 label = d,
-                containerColor = translucentCardSurfaceColor(lightAlpha = 0.68f, darkAlpha = 0.64f),
+                containerColor = numberKeyBg,
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                onClick = { onDigit(d) },
+                onClick = onDigitClick,
                 testTag = "calc_key_$d",
                 modifier = Modifier.weight(1f)
             )
         }
+        val onOpClick = remember(op, onOperator) { { onOperator(op) } }
         CalcKeyButton(
             label = op,
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            onClick = { onOperator(op) },
+            onClick = onOpClick,
             testTag = opTestTag,
             modifier = Modifier.weight(1f)
         )

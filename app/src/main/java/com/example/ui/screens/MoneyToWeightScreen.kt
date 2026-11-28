@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -223,11 +222,12 @@ fun MoneyToWeightScreen(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        val quickAmounts = remember { listOf("10", "20", "50", "100", "200", "500") }
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            listOf("10", "20", "50", "100", "200", "500").forEach { amt ->
+                            quickAmounts.forEach { amt ->
                                 AssistChip(
                                     onClick = { viewModel.applyQuickAmount(amt) },
                                     label = { Text("₹$amt") }
@@ -274,8 +274,7 @@ fun MoneyToWeightScreen(
                     }
                 }
 
-                AnimatedVisibility(visible = state.liveResult != null) {
-                    state.liveResult?.let { result ->
+                state.liveResult?.let { result ->
                         val humanWeight = CalculatorEngine.formatWeightHuman(
                             result = result,
                             kgLabel = strings.kgUnit,
@@ -442,7 +441,6 @@ fun MoneyToWeightScreen(
                             }
                         }
                     }
-                }
             }
         }
     }

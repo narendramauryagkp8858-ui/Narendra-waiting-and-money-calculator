@@ -285,17 +285,20 @@ fun CombinedBillScreen(
                                     )
                                 }
 
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
+                                val weightPresets = remember {
                                     listOf(
                                         Triple("250g", "250", WeightUnit.GRAM),
                                         Triple("500g", "500", WeightUnit.GRAM),
                                         Triple("1 KG", "1", WeightUnit.KG),
                                         Triple("2 KG", "2", WeightUnit.KG),
                                         Triple("5 KG", "5", WeightUnit.KG)
-                                    ).forEach { (label, valStr, unit) ->
+                                    )
+                                }
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    weightPresets.forEach { (label, valStr, unit) ->
                                         AssistChip(
                                             onClick = {
                                                 weightOrQtyInput = valStr
@@ -307,11 +310,12 @@ fun CombinedBillScreen(
                                     }
                                 }
                             } else {
+                                val piecePresets = remember { listOf("1", "2", "5", "10", "12", "24") }
                                 FlowRow(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    listOf("1", "2", "5", "10", "12", "24").forEach { qty ->
+                                    piecePresets.forEach { qty ->
                                         AssistChip(
                                             onClick = {
                                                 weightOrQtyInput = qty

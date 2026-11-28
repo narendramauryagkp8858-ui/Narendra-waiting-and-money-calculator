@@ -33,7 +33,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,16 +100,16 @@ fun ShopLogoAvatar(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val validFile = remember(logoPath) {
-        if (logoPath.isNotBlank()) File(logoPath).takeIf { it.exists() } else null
-    }
-    val imageRequest = remember(validFile, context) {
-        validFile?.let {
+    var imageLoaded by remember(logoPath) { mutableStateOf(false) }
+    val imageRequest = remember(logoPath, context) {
+        if (logoPath.isNotBlank()) {
             ImageRequest.Builder(context)
-                .data(it)
+                .data(File(logoPath))
                 .size(192)
                 .crossfade(false)
                 .build()
+        } else {
+            null
         }
     }
 
@@ -116,25 +119,28 @@ fun ShopLogoAvatar(
         color = MaterialTheme.colorScheme.primaryContainer,
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
     ) {
-        if (imageRequest != null) {
-            AsyncImage(
-                model = imageRequest,
-                contentDescription = "$shopName logo",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!imageLoaded) {
                 Icon(
                     imageVector = Icons.Filled.Storefront,
                     contentDescription = shopName,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(size * 0.52f)
+                )
+            }
+            if (imageRequest != null) {
+                AsyncImage(
+                    model = imageRequest,
+                    contentDescription = "$shopName logo",
+                    onSuccess = { imageLoaded = true },
+                    onError = { imageLoaded = false },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
                 )
             }
         }

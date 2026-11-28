@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -168,17 +167,19 @@ fun WeightToMoneyScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // Active Combined Bill Quick Banner if items already added
-                AnimatedVisibility(visible = billItems.isNotEmpty()) {
-                    val totals = CalculatorEngine.calculateCombinedBillTotals(billItems)
-                    val summaryParts = buildList {
-                        if (totals.weightItemCount > 0) {
-                            add(CalculatorEngine.formatGramsHuman(totals.totalWeightInGrams, strings.kgUnit, strings.gramUnit))
-                        }
-                        if (totals.pieceItemCount > 0) {
-                            add("${CalculatorEngine.formatPlainNumber(totals.totalPieces, 3)} ${strings.piecesPlural}")
-                        }
-                        add(CalculatorEngine.formatAmount(totals.totalAmount))
-                    }.joinToString(" • ")
+                if (billItems.isNotEmpty()) {
+                    val summaryParts = remember(billItems, strings) {
+                        val totals = CalculatorEngine.calculateCombinedBillTotals(billItems)
+                        buildList {
+                            if (totals.weightItemCount > 0) {
+                                add(CalculatorEngine.formatGramsHuman(totals.totalWeightInGrams, strings.kgUnit, strings.gramUnit))
+                            }
+                            if (totals.pieceItemCount > 0) {
+                                add("${CalculatorEngine.formatPlainNumber(totals.totalPieces, 3)} ${strings.piecesPlural}")
+                            }
+                            add(CalculatorEngine.formatAmount(totals.totalAmount))
+                        }.joinToString(" • ")
+                    }
 
                     Card(
                         onClick = onOpenCombinedBill,
@@ -334,11 +335,8 @@ fun WeightToMoneyScreen(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            val presets = listOf(
+                        val presets = remember {
+                            listOf(
                                 Triple("50g", "50", WeightUnit.GRAM),
                                 Triple("100g", "100", WeightUnit.GRAM),
                                 Triple("250g", "250", WeightUnit.GRAM),
@@ -346,6 +344,11 @@ fun WeightToMoneyScreen(
                                 Triple("1 KG", "1", WeightUnit.KG),
                                 Triple("2 KG", "2", WeightUnit.KG)
                             )
+                        }
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             presets.forEach { (label, value, unit) ->
                                 AssistChip(
                                     onClick = { viewModel.applyQuickWeight(value, unit) },
@@ -390,8 +393,7 @@ fun WeightToMoneyScreen(
                 }
 
                 // Live Result Card
-                AnimatedVisibility(visible = state.liveResult != null) {
-                    state.liveResult?.let { result ->
+                state.liveResult?.let { result ->
                         val gramsText = "${CalculatorEngine.formatPlainNumber(result.weightInGrams, 2)} g"
                         val kgText = "${CalculatorEngine.formatPlainNumber(result.weightInKg, 3)} KG"
                         val rateText = "${CalculatorEngine.formatAmount(result.pricePerKg)} / KG"
@@ -558,7 +560,6 @@ fun WeightToMoneyScreen(
                             }
                         }
                     }
-                }
             }
         }
     }
